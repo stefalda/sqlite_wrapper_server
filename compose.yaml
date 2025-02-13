@@ -1,6 +1,7 @@
 services:
     sqlitewrapperserver:
-        build: .
+        #build: . build locally
+        image: sqlite_wrapper_server:latest
         ports:
             - "50051:50051"
         volumes:
