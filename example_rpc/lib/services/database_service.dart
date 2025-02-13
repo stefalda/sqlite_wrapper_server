@@ -5,12 +5,12 @@ import 'package:sqlite_wrapper/sqlite_wrapper.dart';
 import 'package:sqlite_wrapper_sample/models.dart';
 
 class DatabaseService {
-  SqliteWrapperGrpc database = SqliteWrapperGrpc();
+  SqliteWrapperGRPC database = SqliteWrapperGRPC();
 
   bool useGRPC = false;
 
   initServiceManager(
-      {String host = 'localhost', int port = 50051, bool secure = false}) {
+      {String host = 'localhost', int port = 50052, bool secure = false}) {
     database.initServiceManager(host: host, port: port, secure: secure);
   }
 
@@ -18,7 +18,7 @@ class DatabaseService {
   echo() async {
     if (!useGRPC) return;
     final response = await database.echo("CIAO");
-    print("gRPC server responded to echo with: $response");
+    debugPrint("gRPC server responded to echo with: $response");
   }
 
   initDB({inMemory = false}) async {

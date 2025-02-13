@@ -10,6 +10,8 @@ import 'package:sqlite_wrapper_server/services/database_service.dart';
 import 'package:sqlite_wrapper_server/sqlite_wrapper_server.dart';
 
 Future<void> main(List<String> args) async {
+  // Parse arguments
+  Constants.parse(args);
   // Load the service
   final databaseService = InjectX.add(DatabaseService());
   InjectX.add(AuthenticationService());
@@ -20,17 +22,20 @@ Future<void> main(List<String> args) async {
       interceptors: [authInterceptor]);
 
   // Start the server on port 50051 without TLS.
-  final port = int.parse(Constants.serverPort);
+  final port = Constants.serverPort;
   await server.serve(port: port);
   // Disable token authentication
-  SQLiteWrapperServerImpl.runUnauthenticated =
-      (Constants.runUnathenticated == "true");
+  SQLiteWrapperServerImpl.runUnauthenticated = Constants.runUnathenticated;
 
   if (!SQLiteWrapperServerImpl.runUnauthenticated) {
     // Check that the secret key is set
     assert(Constants.secretKey.isNotEmpty,
         "The secret key has not be set, please pass it with define");
+    if (Constants.secretKey.isEmpty) {
+      print("The secret key has not be set, please pass it with --secret_key");
+    }
   }
+  // print("SECRET KEY = ${Constants.secretKey}");
   // Open or create the user DB
   await databaseService.openDatabase(
       path: Constants.usersDBPath, name: Constants.usersDBName);

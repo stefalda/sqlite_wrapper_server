@@ -1,70 +1,73 @@
 /// Environment variables and shared app constants.
-///
-/// You can pass the value like this:
-///
-/// --define=SERVER_PORT=50012
-/// --define=RUN_UNATHENTICATED=false
-/// --define=SECRET_KEY=a1b2c33d4e5f6g7h8i9jakblc
-///
-///
-/// In VSCode you can pass the parameters in the launch.json file like this:
-///
-///        {
-///            "name": "Dart",
-///            "type": "dart",
-///            "request": "launch",
-///            "program": "bin/main.dart",
-///            "toolArgs": [
-///                "--define=SERVER_PORT=50012",
-///                "--define=RUN_UNATHENTICATED=false",
-///                "--define=SECRET_KEY=a1b2c33d4e5f6g7h8i9jakblc"]
-///        }
-///
-///
-///
+
 library;
 
+import 'package:args/args.dart';
+
 abstract class Constants {
-  /// Listeninf Port of the server
-  static const String serverPort = String.fromEnvironment(
-    'SERVER_PORT',
-    defaultValue: '50051',
-  );
+  /// Listening Port of the server
+  static late int serverPort;
 
-  /// Secret uset to generate JWT Keys
-  static const String secretKey = String.fromEnvironment(
-    'SECRET_KEY',
-    defaultValue: '',
-  );
+  /// Secret used to generate JWT Keys
+  static late String secretKey;
 
-  /// Calls are unauthenticated so there's no USERS DB
-  static const String runUnathenticated = String.fromEnvironment(
-    'RUN_UNATHENTICATED',
-    defaultValue: 'false',
-  );
+  // Calls are unauthenticated so there's no USERS DB
+  static late bool runUnathenticated;
 
   /// Name of the database of authenticated users
-  static const String usersDBName = String.fromEnvironment(
-    'USERS_DB_NAME',
-    defaultValue: 'users',
-  );
+  static late String usersDBName;
 
   /// Path to the authenticated users DB
-  static const String usersDBPath = String.fromEnvironment(
-    'USERS_DB_PATH',
-    defaultValue: './',
-  );
+  static late String usersDBPath;
 
   /// Path to where the application DB is stored
-  static const String dbPath = String.fromEnvironment(
-    'DB_PATH',
-    defaultValue: './',
-  );
+  static late String dbPath;
 
   /// If a DB is shared there will be only ONE DB for all the users
   /// otherwise every DB will be specific to a user
-  static const String sharedDB = String.fromEnvironment(
-    'SHARED_DB',
-    defaultValue: 'false',
-  );
+  static late bool sharedDB;
+
+  static void parse(List<String> arguments) {
+    final parser = ArgParser()
+      ..addOption('port',
+          help: 'Server listening port (50051 is the default)',
+          defaultsTo: '50051')
+      ..addOption('secret_key',
+          help: 'Secret uset to generate JWT Key', defaultsTo: '')
+      ..addOption('unauthenticated',
+          help: 'Calls are unauthenticated so there\'s no USERS DB',
+          defaultsTo: "false")
+      ..addOption('users_db_name',
+          help:
+              'Name of the database of authenticated users  (users is default)',
+          defaultsTo: "users")
+      ..addOption('users_db_path',
+          help: 'Path to the database of authenticated users  (./ is default)',
+          defaultsTo: "./")
+      ..addOption('db_path',
+          help: 'Path where databases are stored (./ is default)',
+          defaultsTo: "./")
+      ..addOption('shared_db',
+          help:
+              'If a DB is shared there will be only ONE DB for all the users (default false)',
+          defaultsTo: 'false');
+    // Parse arguments
+    ArgResults argResults;
+    try {
+      argResults = parser.parse(arguments);
+    } catch (e) {
+      print("Error: ${e.toString()}");
+      print(parser.usage);
+      return;
+    }
+
+    // Extract values
+    serverPort = int.parse(argResults['port']);
+    secretKey = argResults['secret_key'];
+    runUnathenticated = argResults['unauthenticated'] == 'true';
+    usersDBName = argResults['users_db_name'];
+    usersDBPath = argResults['users_db_path'];
+    dbPath = argResults['db_path'];
+    sharedDB = argResults['shared_db'] == 'true';
+  }
 }

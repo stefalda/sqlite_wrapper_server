@@ -18,7 +18,7 @@ class SQLiteWrapperServerImpl extends SqliteWrapperServiceBase {
   String _getDBName({required ServiceCall call, required String dbName}) {
     final String? uuid = call.clientMetadata!['user_uuid'];
     if (uuid == null) {
-      if (Constants.sharedDB == "true") {
+      if (Constants.sharedDB == true) {
         return dbName;
       } else {
         throw ("Something is wrong... why isn't the user logged in?");

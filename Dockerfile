@@ -1,35 +1,45 @@
 # Stage 1: Build the Dart application
-FROM dart:latest AS build
+FROM dart:stable AS build
 
+RUN apt-get update && \
+    apt-get -y install libsqlite3-0 libsqlite3-dev
+
+# Resolve app dependencies.
 WORKDIR /app
-
-# Copy pubspec files and install dependencies
-COPY pubspec.yaml pubspec.lock ./
+COPY pubspec.* ./
 RUN dart pub get
 
-# Copy the entire project to the working directory
+# Copy app source code and AOT compile it.
 COPY . .
+# Ensure packages are still up-to-date if anything has changed
+RUN dart pub get --offline
 
 # Build the app (release mode)
-RUN dart compile exe bin/main.dart -o /app/sqlitewrapperserver
+RUN dart compile exe bin/main.dart -o bin/server
 
-# Stage 2: Deploy in a minimal Alpine container
-FROM alpine:latest AS deploy
+# Identify required SQLite libraries
+RUN find /usr/lib -name "libsqlite3.so*" | xargs -I{} cp {} /runtime/lib/
 
-WORKDIR /app
+# Create an empty data dir
+RUN mkdir /data
 
-# Install necessary runtime dependencies for your application
-# For example, if you need curl or any other packages:
-RUN apk --no-cache add \
-    libstdc++ \
-    bash \
-    coreutils
+#DEBUG
+#RUN /bin/sh
 
-# Copy the compiled executable from the build stage
-COPY --from=build /app/sqlitewrapperserver .
+# Build minimal serving image from AOT-compiled `/server` and required system
+# libraries and configuration files stored in `/runtime/` from the build stage.
+FROM scratch
+COPY --from=build /runtime/ /
+COPY --from=build /app/bin/server /app/bin/
+# Copy only the required SQLite libraries from the collected directory
+COPY --from=build /runtime/lib /lib/
+# Copy sh so we can expand the environment varianble
+COPY --from=build /bin/sh /bin/sh
+# Copy the empty data dir
+COPY --from=build /data /data
 
-# Expose necessary ports (if your application uses HTTP/HTTPS, for example)
-EXPOSE 50012
+# Start server.
+EXPOSE 50051
+CMD /bin/sh -c '/app/bin/server --port 50051 --secret_key "$SECRET_KEY" --users_db_path=/data --db_path=/data'
 
-# Define entry point to run your Dart application
-ENTRYPOINT ["./sqlitewrapperserver", "--define=SERVER_PORT=50012", "--define=SECRET_KEY=a1b2c33d4e5f6g7h8i9jakblc"]
+

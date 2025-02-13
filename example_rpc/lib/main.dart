@@ -13,7 +13,7 @@ void main() async {
   //SQLiteWrapper().client = manager.client;
   // Init the DB
   databaseService.useGRPC = true;
-  databaseService.initServiceManager(host: 'localhost', port: 50052);
+  databaseService.initServiceManager(host: '0.0.0.0', port: 50052);
   await registrationInfoService.getRegistrationInfo();
 
   await databaseService.echo();

@@ -29,8 +29,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  sqlite_wrapper:
-    path: ..
+  sqlite_wrapper: ^0.3.1-beta
   path_provider: ^2.1.4 # Required to find the system documents directory
   path: ^1.9.0 # Required to compute path
   sqlite3_flutter_libs: ^0.5.24 # Required by Android

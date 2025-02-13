@@ -1,6 +1,6 @@
 name: sqlite_wrapper_server
 description: A sample command-line application.
-version: 1.0.0
+version: 1.0.0-beta
 # repository: https://github.com/my_org/my_repo
 
 environment:
@@ -10,8 +10,7 @@ environment:
 dependencies:
   # path: ^1.8.0
   sqlite3: ^2.7.3
-  sqlite_wrapper: 
-    path: ..
+  sqlite_wrapper: ^0.3.1-beta
   grpc: ^4.0.1
   fixnum: ^1.1.1
   protobuf: ^3.1.0
@@ -19,6 +18,7 @@ dependencies:
   dart_jsonwebtoken: ^2.17.0
   uuid: ^4.5.1
   inject_x: ^0.0.3
+  args: ^2.6.0
   
 
 dev_dependencies:

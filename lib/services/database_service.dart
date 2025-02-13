@@ -8,6 +8,9 @@ class DatabaseService {
   /// Open or create the users database
   Future<void> openDatabase(
       {required String path, required String name}) async {
+    if (!path.endsWith("/")) {
+      path = "$path/";
+    }
     SQLiteWrapper().openDB("$path$name.sqlite", onCreate: () async {
       final sql = """CREATE TABLE IF NOT EXISTS users (
       id TEXT PRIMARY KEY DEFAULT (hex(randomblob(16))),

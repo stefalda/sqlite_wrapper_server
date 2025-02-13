@@ -63,5 +63,5 @@ static_resources:
                 address:
                   socket_address:
                     # address: gRPC-server
-                    address: 0.0.0.0
+                    address: sqlitewrapperserver
                     port_value: 50051

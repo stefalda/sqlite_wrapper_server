@@ -1,0 +1,17 @@
+services:
+    sqlitewrapperserver:
+        build: .
+        ports:
+            - "50051:50051"
+        volumes:
+            - ./data:/data
+        environment:
+            SECRET_KEY: "a1b2c33d4e5f6g7h8i9jakblc"
+
+    envoy:
+        image: envoyproxy/envoy:v1.33-latest
+        volumes:
+            - ./envoy/envoy.yaml:/etc/envoy/envoy.yaml
+        ports:
+            - "50052:50052"
+            - "9901:9901"
