@@ -1,9 +1,9 @@
 services:
     sqlitewrapperserver:
         #build: . build locally
-        image: sqlite_wrapper_server:latest
+        image: sfalda/sqlite_wrapper_server:latest #download official image
         ports:
-            - "50051:50051"
+            - "50051"
         volumes:
             - ./data:/data
         environment:
@@ -15,4 +15,4 @@ services:
             - ./envoy/envoy.yaml:/etc/envoy/envoy.yaml
         ports:
             - "50052:50052"
-            - "9901:9901"
+            #- "9901:9901" # admin console

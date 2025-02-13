@@ -29,27 +29,27 @@ database storage.
 
 ### Configuration
 
-Configure the server using environment variables or command line arguments. Key
-configuration options include:
+Configure the server using command line arguments. Key configuration options
+include:
 
-| Variable             | Description                                  | Default Value |
-| -------------------- | -------------------------------------------- | ------------- |
-| `SERVER_PORT`        | Listening port of the server                 | 50051         |
-| `SECRET_KEY`         | Secret used to generate JWT keys             |               |
-| `RUN_UNATHENTICATED` | Allows unauthenticated access                | false         |
-| `USERS_DB_NAME`      | Name of the database for authenticated users | users         |
-| `USERS_DB_PATH`      | Path to the authenticated users DB           | ./            |
-| `DB_PATH`            | Path where application databases are stored  | ./            |
-| `SHARED_DB`          | If true, a single shared database is used    | false         |
+| Variable          | Description                                  | Default Value |
+| ----------------- | -------------------------------------------- | ------------- |
+| `port`            | Listening port of the server                 | 50051         |
+| `secret_key`      | Secret used to generate JWT keys             |               |
+| `unauthenticated` | Allows unauthenticated access                | false         |
+| `users_db_name`   | Name of the database for authenticated users | users         |
+| `users_db_path`   | Path to the authenticated users DB           | ./            |
+| `db_path`         | Path where application databases are stored  | ./            |
+| `shared_db`       | If true, a single shared database is used    | false         |
 
 ### Running the Server
 
 Start the server with custom configurations:
 
 ```bash
-dart bin/main.dart --define=SERVER_PORT=50012 \
-                   --define=RUN_UNATHENTICATED=false \
-                   --define=SECRET_KEY=a1b2c33d4e5f6g7h8i9jakblc
+dart bin/main.dart --port=50012 \
+                   --unauthenticated=false \
+                   --secret_key=a1b2c33d4e5f6g7h8i9jakblc
 ```
 
 ### VSCode Launch Configuration
@@ -62,11 +62,7 @@ Configure the server in VSCode by editing `launch.json`:
     "type": "dart",
     "request": "launch",
     "program": "bin/main.dart",
-    "toolArgs": [
-        "--define=SERVER_PORT=50012",
-        "--define=RUN_UNATHENTICATED=false",
-        "--define=SECRET_KEY=a1b2c33d4e5f6g7h8i9jakblc"
-    ]
+    "args": ["--port", "50051", "--secret_key", "a1b2c33d4e5f6g7h8i9jakblc"]
 }
 ```
 
@@ -152,22 +148,24 @@ static_resources:
 Use the following `docker-compose.yaml` file to run both the server and Envoy:
 
 ```yaml
-version: "3.8"
-
 services:
     sqlitewrapperserver:
-        build: .
+        #build: . build locally
+        image: sfalda/sqlite_wrapper_server:latest
         ports:
-            - "50012"
+            - "50051"
+        volumes:
+            - ./data:/data
         environment:
-            SERVER_PORT: "50012"
+            SECRET_KEY: "a1b2c33d4e5f6g7h8i9jakblc"
 
     envoy:
-        image: envoyproxy/envoy:v1.31-latest
+        image: envoyproxy/envoy:v1.33-latest
         volumes:
-            - ./envoy.yaml:/etc/envoy/envoy.yaml
+            - ./envoy/envoy.yaml:/etc/envoy/envoy.yaml
         ports:
-            - "8080:8080"
+            - "50052:50052"
+            #- "9901:9901" # admin console
 ```
 
 ### Deployment
@@ -175,7 +173,7 @@ services:
 Build and run the Docker containers:
 
 ```bash
-docker-compose up --build
+docker compose up
 ```
 
 ## Usage
