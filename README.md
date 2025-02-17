@@ -158,6 +158,8 @@ services:
             - ./data:/data
         environment:
             SECRET_KEY: "a1b2c33d4e5f6g7h8i9jakblc"
+            UNAUTHENTICATED: false
+            SHARED_DB: false
 
     envoy:
         image: envoyproxy/envoy:v1.33-latest
