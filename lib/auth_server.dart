@@ -24,7 +24,10 @@ class AuthServiceImpl extends AuthServiceBase {
         email: request.email, password: request.password, dbName: dbName);
 
     // Generate JWT token
-    final token = authenticationService.generateToken(request.email);
+    final userid =
+        await databaseService.getUserId(email: request.email, dbName: dbName);
+    final token = authenticationService.generateToken(
+        email: request.email, userid: userid);
 
     return AuthResponse()
       ..success = true
@@ -52,7 +55,10 @@ class AuthServiceImpl extends AuthServiceBase {
     }
 
     // Generate JWT token
-    final token = authenticationService.generateToken(request.email);
+    final userid =
+        await databaseService.getUserId(email: request.email, dbName: dbName);
+    final token = authenticationService.generateToken(
+        email: request.email, userid: userid);
 
     return AuthResponse()
       ..success = true
@@ -67,6 +73,7 @@ class AuthServiceImpl extends AuthServiceBase {
       JWT jwt = authenticationService.verifyToken(request.token);
       return ValidateTokenResponse()
         ..valid = true
+        ..userid = jwt.payload['userid'] as String
         ..email = jwt.payload['email'] as String;
     } catch (e) {
       return ValidateTokenResponse()

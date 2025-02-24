@@ -117,14 +117,15 @@ class DatabaseService {
     return result == 0;
   }
 
-  closeDatabaseConnection() async {
+  Future<void> closeDatabaseConnection() async {
     for (String dbName in SQLiteWrapper().getDatabases().getNames()) {
       SQLiteWrapper().closeDB(dbName: dbName);
     }
   }
 
   /// Return userId from email
-  getUserId({required String email, required String dbName}) async {
+  Future<String> getUserId(
+      {required String email, required String dbName}) async {
     final sql = "SELECT id FROM users WHERE email = ?";
     return await SQLiteWrapper()
         .query(sql, params: [email], singleResult: true, dbName: dbName);

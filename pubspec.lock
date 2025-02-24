@@ -437,10 +437,10 @@ packages:
     dependency: "direct main"
     description:
       name: sqlite_wrapper
-      sha256: "3198c791bb454cc969e37a16868311bd5728b7a31096f85297e8640f26c20dd5"
+      sha256: c9de0cd1b5279f155ad77592c49cff13b839800adc064d46a806f6c048360a61
       url: "https://pub.dev"
     source: hosted
-    version: "0.3.1-beta"
+    version: "0.3.3-beta"
   stack_trace:
     dependency: transitive
     description:

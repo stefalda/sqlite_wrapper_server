@@ -13,10 +13,15 @@ class AuthenticationService {
     return jwt.payload['email'] as String;
   }
 
+  String extractUserIdFromJWT(JWT jwt) {
+    return jwt.payload['userid'] as String;
+  }
+
   /// Genereate the token and return to user
-  String generateToken(String email) {
+  String generateToken({required String email, required String userid}) {
     final jwt = JWT(
       {
+        'userid': userid,
         'email': email,
         'iat': DateTime.now().millisecondsSinceEpoch,
       },

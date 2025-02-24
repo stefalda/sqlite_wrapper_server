@@ -1,8 +1,6 @@
 import 'package:grpc/grpc.dart';
 import 'package:inject_x/inject_x.dart';
-import 'package:sqlite_wrapper_server/constants.dart';
 import 'package:sqlite_wrapper_server/services/authentication_service.dart';
-import 'package:sqlite_wrapper_server/services/database_service.dart';
 import 'package:sqlite_wrapper_server/sqlite_wrapper_server.dart';
 
 final publicPaths = {
@@ -33,9 +31,11 @@ Future<GrpcError?> authInterceptor(
     // Add the email to the metadata
     final String email = authenticationService.extractEmailFromJWT(jwt);
     call.clientMetadata!['email'] = email;
-    // Add the uuid too
-    final uuid = await inject<DatabaseService>()
+    // Add the userid from the metadata
+    String uuid = authenticationService.extractUserIdFromJWT(jwt);
+    /*uuid ??= await inject<DatabaseService>()
         .getUserId(email: email, dbName: Constants.usersDBName);
+        */
     call.clientMetadata!['user_uuid'] = uuid;
   } catch (e) {
     return GrpcError.unauthenticated();
