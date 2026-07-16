@@ -117,8 +117,8 @@ class SQLiteWrapperServerImpl extends SqliteWrapperServiceBase {
       if (db == null) {
         throw GrpcError.failedPrecondition('Database not opened');
       }
-      final res =
-          db.select(request.sql, _unpack(request.params.toList()));
+      final res = await db
+          .select(request.sql, _unpack(request.params.toList()));
       return SqlQueryResponse(result: jsonEncode(res));
     } catch (e) {
       throw GrpcError.invalidArgument('SQL query error: $e');

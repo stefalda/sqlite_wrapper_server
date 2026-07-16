@@ -1,3 +1,7 @@
+## 1.2.1
+
+- Fixed missing await in select
+
 ## 1.2.0
 
 - **Argon2id password hashing:** SHA-256 replaced with Argon2id via
