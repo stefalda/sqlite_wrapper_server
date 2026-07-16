@@ -3,7 +3,6 @@ import 'dart:io';
 import 'package:grpc/grpc.dart';
 import 'package:inject_x/inject_x.dart';
 import 'package:sqlite_wrapper/generated/auth.pbgrpc.dart';
-import 'package:sqlite_wrapper/generated/sqlite_wrapper_rpc.pbgrpc.dart';
 import 'package:sqlite_wrapper/sqlite_wrapper.dart';
 import 'package:sqlite_wrapper_server/auth_interceptor.dart';
 import 'package:sqlite_wrapper_server/auth_server.dart';

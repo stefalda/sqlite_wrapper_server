@@ -1,3 +1,29 @@
+## 1.2.0
+
+- **Argon2id password hashing:** SHA-256 replaced with Argon2id via
+  `cryptography_plus`. Existing SHA-256 hashes are migrated to Argon2id on
+  next successful login; the `hash_algorithm` column tracks the algorithm
+  version per user.
+- **JWT fixes:** `iat` now uses Unix seconds (RFC 7519 §2), `exp` added at
+  24 hours. Typo `runUnathenticated` renamed to `runUnauthenticated` with a
+  `@Deprecated` alias. Race condition closed by setting the flag before
+  `server.serve()`.
+- **Single-query auth:** `register` and `login` each issue 1 query instead
+  of 3. `insertUser` returns the generated UUID directly. `isLoginCorrect`
+  returns `(bool, String?)` and uses Map key access (fixes the `res[0]`
+  crash on multi-column `query()` results).
+- **Path traversal protection:** `_sanitizeDBName` strips non-alphanumeric
+  characters from `dbName` before filesystem interpolation.
+- **SQLITE_BUSY retry:** `execute` retries up to 3 times with 50/100/150ms
+  backoff, then throws `GrpcError.unavailable`.
+- **Uniform login errors:** Both "email not found" and "wrong password"
+  return `'Invalid email or password'` to prevent user enumeration.
+- **Dependency cleanup:** Removed unused `sqlite3` and `fixnum` direct
+  dependencies; added `cryptography_plus`.
+- **Test coverage:** 5 new test files (unit + integration) — 35 tests total.
+- **README updated:** reflects the new cryptography dependency, Argon2id,
+  and JWT expiry documentation.
+
 ## 1.1.0
 
 - **New `Watch` RPC (server-streaming gRPC):** clients can now subscribe to SQL

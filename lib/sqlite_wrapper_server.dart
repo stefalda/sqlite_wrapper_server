@@ -66,7 +66,7 @@ class SQLiteWrapperServerImpl extends SqliteWrapperServiceBase {
     return OpenDBResponse(
         created: version == 0,
         version: version,
-        sqliteVersion: sqliteVersion as String,
+        sqliteVersion: sqliteVersion,
         dbName: dbName);
   }
 

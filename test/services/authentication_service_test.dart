@@ -58,7 +58,7 @@ void main() {
         email: 'user@example.com',
         userid: 'uuid-123',
       );
-      final tampered = token.substring(0, token.length - 5) + 'xxxxx';
+      final tampered = '${token.substring(0, token.length - 5)}xxxxx';
 
       expect(() => authService.verifyToken(tampered), throwsException);
     });

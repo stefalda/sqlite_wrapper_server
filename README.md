@@ -10,14 +10,19 @@ database storage.
 - **Remote Database Access:** Utilizes the `sqlite_wrapper` package for seamless
   interaction with SQLite databases over a network.
 - **User Authentication:** Supports user registration and authentication using
-  email and password. Each authenticated user is assigned a unique UUID.
+  email and password. Passwords are hashed with **Argon2id** (OWASP first
+  choice); legacy SHA-256 hashes are migrated automatically on next login.
+- **JWT sessions:** Tokens include `iat` (Unix seconds) and `exp` (24 hours)
+  for RFC-compliant session management.
 - **Database Management:** Users have their own databases, named by combining
   the provided `dbName` with their unique UUID.
+- **Connection pooling:** All RPCs share a static `DatabasePool` with reference
+  counting, eliminating file-descriptor churn under concurrent load.
 - **Real-time Watch (Server-Streaming gRPC):** Subscribe to SQL queries via the
   `Watch` RPC and receive push updates whenever any client modifies the watched
-  tables. The server uses a `DatabasePool` with reference-counted connections so
-  that mutations from any client trigger notifications on all active watch
-  subscriptions — enabling reactive multi-user UIs without polling.
+  tables. The server uses a reference-counted connection pool so that mutations
+  from any client trigger notifications on all active watch subscriptions —
+  enabling reactive multi-user UIs without polling.
 - **Demo Flutter Client:** Includes a sample client application to demonstrate
   functionality.
 - **Proxy Integration:** Due to CORS restrictions and Dart gRPC limitations, the
