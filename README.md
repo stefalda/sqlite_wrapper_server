@@ -13,6 +13,11 @@ database storage.
   email and password. Each authenticated user is assigned a unique UUID.
 - **Database Management:** Users have their own databases, named by combining
   the provided `dbName` with their unique UUID.
+- **Real-time Watch (Server-Streaming gRPC):** Subscribe to SQL queries via the
+  `Watch` RPC and receive push updates whenever any client modifies the watched
+  tables. The server uses a `DatabasePool` with reference-counted connections so
+  that mutations from any client trigger notifications on all active watch
+  subscriptions — enabling reactive multi-user UIs without polling.
 - **Demo Flutter Client:** Includes a sample client application to demonstrate
   functionality.
 - **Proxy Integration:** Due to CORS restrictions and Dart gRPC limitations, the
@@ -189,6 +194,24 @@ unique UUID, stored in the local users database.
 
 Authenticated users have their own SQLite databases named by combining `dbName`
 with their assigned UUID.
+
+### Real-time Watch (gRPC Server-Streaming)
+
+Clients can call the `Watch` RPC to subscribe to a SQL query. The server pushes
+the initial result followed by incremental updates whenever any client (including
+other users) executes a mutation on one of the watched tables. The feature is
+exposed via `SqliteWrapperGRPC.watch()` — the same API as the local `watch()`,
+but backed by a server-streaming gRPC call.
+
+```dart
+final stream = database.watch("SELECT * FROM todos",
+    tables: ["todos"], fromMap: Todo.fromMap);
+```
+
+The server uses a `DatabasePool` that reference-counts connections per database
+name. Watch subscriptions keep the connection alive; mutations from any RPC go
+through the pool and trigger `updateStreams()` on all active streams, enabling
+real-time cross-client updates.
 
 ## License
 

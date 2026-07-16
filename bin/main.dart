@@ -6,6 +6,7 @@ import 'package:sqlite_wrapper/sqlite_wrapper.dart';
 import 'package:sqlite_wrapper_server/auth_interceptor.dart';
 import 'package:sqlite_wrapper_server/auth_server.dart';
 import 'package:sqlite_wrapper_server/constants.dart';
+import 'package:sqlite_wrapper_server/database_pool.dart';
 import 'package:sqlite_wrapper_server/services/authentication_service.dart';
 import 'package:sqlite_wrapper_server/services/database_service.dart';
 import 'package:sqlite_wrapper_server/sqlite_wrapper_server.dart';
@@ -45,12 +46,14 @@ Future<void> main(List<String> args) async {
 // Handle program termination (Ctrl+C or process kill)
   ProcessSignal.sigint.watch().listen((_) async {
     print("Received SIGINT, closing database...");
+    DatabasePool.closeAll();
     await databaseService.closeDatabaseConnection();
     exit(0); // Ensure program exits after cleanup
   });
 
   ProcessSignal.sigterm.watch().listen((_) async {
     print("Received SIGTERM, closing database...");
+    DatabasePool.closeAll();
     await databaseService.closeDatabaseConnection();
     exit(0);
   });

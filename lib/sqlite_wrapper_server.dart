@@ -1,55 +1,64 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:grpc/grpc.dart';
-import 'package:inject_x/inject_x.dart';
 import 'package:protobuf/well_known_types/google/protobuf/any.pb.dart';
 import 'package:protobuf/well_known_types/google/protobuf/wrappers.pb.dart';
 import 'package:sqlite_wrapper/sqlite_wrapper.dart';
 import 'package:sqlite_wrapper_server/constants.dart';
-import 'package:sqlite_wrapper_server/services/database_service.dart';
+import 'package:sqlite_wrapper_server/database_pool.dart';
 
-/// Implementation of the SqliteService defined in your sqlite.proto.
+/// Implementation of the SqliteService defined in the proto file.
 class SQLiteWrapperServerImpl extends SqliteWrapperServiceBase {
-  static final List<StreamInfo> streams = [];
-  final sqliteWrapper = SQLiteWrapperCore();
-  final databaseService = inject<DatabaseService>();
-
-  /// The DB Name is created appending to the dbName the user UUID
+  /// The DB Name is created appending to the dbName the user UUID.
   String _getDBName({required ServiceCall call, required String dbName}) {
     final String? uuid = call.clientMetadata!['user_uuid'];
     if (uuid == null) {
       if (Constants.sharedDB == true) {
         return dbName;
       } else {
-        throw ("Something is wrong... why isn't the user logged in?");
+        throw GrpcError.unauthenticated(
+            'User not authenticated for non-shared database');
       }
     }
     return "${dbName}_$uuid";
   }
 
   String _getDBPath(String dbName) {
+    // Strip trailing slash from dbPath to avoid double-slash in the final path.
     String dbPath = Constants.dbPath;
+    if (dbPath.endsWith('/')) {
+      dbPath = dbPath.substring(0, dbPath.length - 1);
+    }
     return "$dbPath/$dbName.sqlite";
   }
 
   // Allow all connections without token authentication
   static bool runUnauthenticated = false;
+
   @override
   Future<OpenDBResponse> openDB(ServiceCall call, OpenDBRequest request) async {
     final String dbName = _getDBName(call: call, dbName: request.dbName);
 
     print("OpenDB called: version=${request.version}, dbName=$dbName");
 
-    final res = await sqliteWrapper.openDB(_getDBPath(dbName),
-        version: request.version); //dbName: dbName,
+    // Warm the connection via the pool so it remains open for subsequent calls.
+    final pool = DatabasePool.get(dbName, _getDBPath(dbName),
+        version: request.version);
+    final version = await pool.getVersion();
+    final sqliteVersion =
+        await pool.query("PRAGMA sqlite_version", singleResult: true);
 
-    sqliteWrapper.closeDB();
+    // openDB is a warm-up call; decrement refcount so the pool can still
+    // close cleanly.  The connection stays open because execute/select
+    // and watch will call get/subscribe and re-increment.
+    // (We keep the refCount bumped for the duration of this RPC only.)
+    DatabasePool.close(dbName);
 
-    // Dummy response; replace with actual database opening logic.
     return OpenDBResponse(
-        created: res.created,
-        version: res.version,
-        sqliteVersion: res.sqliteVersion,
+        created: version == 0,
+        version: version,
+        sqliteVersion: sqliteVersion as String,
         dbName: dbName);
   }
 
@@ -57,8 +66,8 @@ class SQLiteWrapperServerImpl extends SqliteWrapperServiceBase {
   Future<CloseDBResponse> closeDB(
       ServiceCall call, CloseDBRequest request) async {
     final String dbName = _getDBName(call: call, dbName: request.dbName);
-    sqliteWrapper.closeDB(dbName: dbName);
     print("CloseDB called: dbName=$dbName");
+    DatabasePool.close(dbName);
     return CloseDBResponse(success: true);
   }
 
@@ -68,15 +77,21 @@ class SQLiteWrapperServerImpl extends SqliteWrapperServiceBase {
     final String dbName = _getDBName(call: call, dbName: request.dbName);
     print(
         "Execute called: sql=${request.sql}, params=${request.params}, dbName=$dbName");
-    await sqliteWrapper.openDB(_getDBPath(dbName));
-    final res = await sqliteWrapper.execute(
-      request.sql,
-      params: _unpack(request.params.toList()),
-    );
-    sqliteWrapper.closeDB();
-
-    // Replace with actual SQL command execution.
-    return SqlQueryResponse(result: jsonEncode(res));
+    final pool = DatabasePool.get(dbName, _getDBPath(dbName));
+    try {
+      // Use tables from request so that updateStreams is triggered
+      // on the correct tables (the wrapper's execute calls updateStreams).
+      final res = await pool.execute(
+        request.sql,
+        params: _unpack(request.params.toList()),
+        tables: request.tables,
+      );
+      return SqlQueryResponse(result: jsonEncode(res));
+    } catch (e) {
+      throw GrpcError.invalidArgument('SQL execution error: $e');
+    } finally {
+      DatabasePool.close(dbName);
+    }
   }
 
   @override
@@ -85,12 +100,49 @@ class SQLiteWrapperServerImpl extends SqliteWrapperServiceBase {
     final String dbName = _getDBName(call: call, dbName: request.dbName);
     print(
         "Select called: sql=${request.sql}, params=${request.params}, dbName=$dbName");
-    await sqliteWrapper.openDB(_getDBPath(dbName));
-    final db = sqliteWrapper.getDatabase(); //dbName: dbName
-    final res = db!.select(
-        request.sql, _unpack(request.params.toList())); // dbName: dbName
-    sqliteWrapper.closeDB();
-    return SqlQueryResponse(result: jsonEncode(res));
+    final pool = DatabasePool.get(dbName, _getDBPath(dbName));
+    try {
+      final db = pool.getDatabase();
+      if (db == null) {
+        throw GrpcError.failedPrecondition('Database not opened');
+      }
+      final res =
+          db.select(request.sql, _unpack(request.params.toList()));
+      return SqlQueryResponse(result: jsonEncode(res));
+    } catch (e) {
+      throw GrpcError.invalidArgument('SQL query error: $e');
+    } finally {
+      DatabasePool.close(dbName);
+    }
+  }
+
+  @override
+  Stream<WatchResponse> watch(ServiceCall call, WatchRequest request) async* {
+    final String dbName = _getDBName(call: call, dbName: request.dbName);
+    final String dbPath = _getDBPath(dbName);
+
+    print(
+        "Watch called: sql=${request.sql}, tables=${request.tables}, dbName=$dbName");
+
+    final Stream stream = DatabasePool.subscribe(
+      dbName: dbName,
+      dbPath: dbPath,
+      sql: request.sql,
+      params: _unpack(request.params.toList()),
+      tables: request.tables,
+      singleResult: request.singleResult,
+    );
+
+    try {
+      await for (final result in stream) {
+        yield WatchResponse(
+          json: jsonEncode(result),
+          singleResult: request.singleResult,
+        );
+      }
+    } finally {
+      DatabasePool.unsubscribe(dbName);
+    }
   }
 
   List<Object?> _unpack(List<Any> params) {
@@ -116,11 +168,13 @@ class SQLiteWrapperServerImpl extends SqliteWrapperServiceBase {
     final String dbName = _getDBName(call: call, dbName: request.dbName);
 
     print("GetVersion called: dbName=$dbName");
-    await sqliteWrapper.openDB(_getDBPath(dbName));
-    final version = await sqliteWrapper.getVersion();
-    sqliteWrapper.closeDB();
-    // Replace with logic to retrieve the database version.
-    return GetVersionResponse(version: version);
+    final pool = DatabasePool.get(dbName, _getDBPath(dbName));
+    try {
+      final version = await pool.getVersion();
+      return GetVersionResponse(version: version);
+    } finally {
+      DatabasePool.close(dbName);
+    }
   }
 
   @override
@@ -128,11 +182,13 @@ class SQLiteWrapperServerImpl extends SqliteWrapperServiceBase {
       ServiceCall call, SetVersionRequest request) async {
     final String dbName = _getDBName(call: call, dbName: request.dbName);
     print("SetVersion called: dbName=$dbName, version=${request.version}");
-    await sqliteWrapper.openDB(_getDBPath(dbName));
-    await sqliteWrapper.setVersion(request.version);
-    sqliteWrapper.closeDB();
-    // Replace with logic to set the database version.
-    return SetVersionResponse(success: true);
+    final pool = DatabasePool.get(dbName, _getDBPath(dbName));
+    try {
+      await pool.setVersion(request.version);
+      return SetVersionResponse(success: true);
+    } finally {
+      DatabasePool.close(dbName);
+    }
   }
 
   /// Echo method... used for testing
