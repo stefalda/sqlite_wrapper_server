@@ -53,7 +53,7 @@ class RegistrationInfoService {
     await setRegistrationInfo();
   }
 
-  _setTokenValue() {
+  void _setTokenValue() {
     inject<DatabaseService>().database.token = registrationInfo.token ?? "";
   }
 }

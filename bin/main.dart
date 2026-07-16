@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:grpc/grpc.dart';
 import 'package:inject_x/inject_x.dart';
+import 'package:sqlite_wrapper/sqlite_wrapper.dart';
 import 'package:sqlite_wrapper_server/auth_interceptor.dart';
 import 'package:sqlite_wrapper_server/auth_server.dart';
 import 'package:sqlite_wrapper_server/constants.dart';
@@ -13,6 +14,7 @@ Future<void> main(List<String> args) async {
   // Parse arguments
   Constants.parse(args);
   // Load the service
+  InjectX.add<SQLiteWrapperBase>(SQLiteWrapperCore());
   final databaseService = InjectX.add(DatabaseService());
   InjectX.add(AuthenticationService());
 

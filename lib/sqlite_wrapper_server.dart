@@ -2,8 +2,8 @@ import 'dart:convert';
 
 import 'package:grpc/grpc.dart';
 import 'package:inject_x/inject_x.dart';
-import 'package:sqlite_wrapper/generated/google/protobuf/any.pb.dart';
-import 'package:sqlite_wrapper/generated/google/protobuf/wrappers.pb.dart';
+import 'package:protobuf/well_known_types/google/protobuf/any.pb.dart';
+import 'package:protobuf/well_known_types/google/protobuf/wrappers.pb.dart';
 import 'package:sqlite_wrapper/sqlite_wrapper.dart';
 import 'package:sqlite_wrapper_server/constants.dart';
 import 'package:sqlite_wrapper_server/services/database_service.dart';
@@ -87,13 +87,13 @@ class SQLiteWrapperServerImpl extends SqliteWrapperServiceBase {
         "Select called: sql=${request.sql}, params=${request.params}, dbName=$dbName");
     await sqliteWrapper.openDB(_getDBPath(dbName));
     final db = sqliteWrapper.getDatabase(); //dbName: dbName
-    final res = db.select(
+    final res = db!.select(
         request.sql, _unpack(request.params.toList())); // dbName: dbName
     sqliteWrapper.closeDB();
     return SqlQueryResponse(result: jsonEncode(res));
   }
 
-  _unpack(List<Any> params) {
+  List<Object?> _unpack(List<Any> params) {
     return params.map((any) {
       if (any.typeUrl.endsWith('Int64Value')) {
         return any.unpackInto(Int64Value()).value.toInt();

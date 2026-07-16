@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:crypto/crypto.dart';
+import 'package:inject_x/inject_x.dart';
 import 'package:sqlite_wrapper/sqlite_wrapper.dart';
 import 'package:uuid/uuid.dart';
 
@@ -11,7 +12,7 @@ class DatabaseService {
     if (!path.endsWith("/")) {
       path = "$path/";
     }
-    SQLiteWrapper().openDB("$path$name.sqlite", onCreate: () async {
+    inject<SQLiteWrapperBase>().openDB("$path$name.sqlite", onCreate: () async {
       final sql = """CREATE TABLE IF NOT EXISTS users (
       id TEXT PRIMARY KEY DEFAULT (hex(randomblob(16))),
       email TEXT UNIQUE NOT NULL,
@@ -23,7 +24,7 @@ class DatabaseService {
       -- Create an index on the email column to improve lookup performance
       CREATE INDEX IF NOT EXISTS idx_email ON users(email);
       """;
-      await SQLiteWrapper().execute(sql, dbName: name);
+      await inject<SQLiteWrapperBase>().execute(sql, dbName: name);
     }, dbName: name);
   }
 
@@ -31,7 +32,7 @@ class DatabaseService {
   Future<bool> emailAlreadyRegistered(String email,
       {required String dbName}) async {
     final sql = "SELECT count(*) FROM users WHERE email = ?";
-    int count = await SQLiteWrapper()
+    int count = await inject<SQLiteWrapperBase>()
         .query(sql, params: [email], singleResult: true, dbName: dbName);
     return count > 0;
   }
@@ -58,7 +59,7 @@ class DatabaseService {
     final id = Uuid().v7();
 
     try {
-      await SQLiteWrapper().execute(
+      await inject<SQLiteWrapperBase>().execute(
         sqlInsertUser,
         params: [
           id, // User's unique identifier
@@ -79,7 +80,7 @@ class DatabaseService {
       required String password,
       required String dbName}) async {
     const sql = 'SELECT salt, password_hash FROM users WHERE email = ?';
-    final res = await SQLiteWrapper()
+    final res = await inject<SQLiteWrapperBase>()
         .query(sql, params: [email], singleResult: true, dbName: dbName);
     // Check if a user was found
     if (res == null || res.length < 2) {
@@ -118,8 +119,8 @@ class DatabaseService {
   }
 
   Future<void> closeDatabaseConnection() async {
-    for (String dbName in SQLiteWrapper().getDatabases().getNames()) {
-      SQLiteWrapper().closeDB(dbName: dbName);
+    for (String dbName in inject<SQLiteWrapperBase>().getDatabases().getNames()) {
+      inject<SQLiteWrapperBase>().closeDB(dbName: dbName);
     }
   }
 
@@ -127,7 +128,7 @@ class DatabaseService {
   Future<String> getUserId(
       {required String email, required String dbName}) async {
     final sql = "SELECT id FROM users WHERE email = ?";
-    return await SQLiteWrapper()
+    return await inject<SQLiteWrapperBase>()
         .query(sql, params: [email], singleResult: true, dbName: dbName);
   }
 }

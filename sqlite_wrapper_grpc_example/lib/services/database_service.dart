@@ -5,23 +5,24 @@ import 'package:sqlite_wrapper/sqlite_wrapper.dart';
 import 'package:sqlite_wrapper_sample/models.dart';
 
 class DatabaseService {
-  SqliteWrapperGRPC database = SqliteWrapperGRPC();
+  late SqliteWrapperGRPC database;
 
   bool useGRPC = false;
 
-  initServiceManager(
+  void initServiceManager(
       {String host = 'localhost', int port = 50052, bool secure = false}) {
-    database.initServiceManager(host: host, port: port, secure: secure);
+    database = SqliteWrapperGRPC.withHostAndPort(
+        host: host, port: port, secure: secure);
   }
 
   /// Test echo method
-  echo() async {
+  Future<void> echo() async {
     if (!useGRPC) return;
     final response = await database.echo("CIAO");
     debugPrint("gRPC server responded to echo with: $response");
   }
 
-  initDB({inMemory = false}) async {
+  Future<void> initDB({bool inMemory = false}) async {
     String dbPath = inMemoryDatabasePath;
     if (kIsWeb && !useGRPC) {
       dbPath = 'todoDatabase';

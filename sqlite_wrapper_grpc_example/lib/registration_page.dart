@@ -3,9 +3,9 @@ import 'package:inject_x/inject_x.dart';
 import 'package:sqlite_wrapper_sample/services/registration_info_service.dart';
 
 class RegistrationPage extends StatefulWidget {
-  bool loginVersion;
+  final bool loginVersion;
   final VoidCallback onLogin;
-  RegistrationPage(
+  const RegistrationPage(
       {super.key, required this.loginVersion, required this.onLogin});
 
   @override
@@ -14,10 +14,16 @@ class RegistrationPage extends StatefulWidget {
 
 class _RegistrationPageState extends State<RegistrationPage> {
   final _formKey = GlobalKey<FormState>();
-
+  late bool loginVersion;
   String email = '';
   String password = '';
   String confirmPassword = '';
+
+  @override
+  void initState() {
+    super.initState();
+    loginVersion = widget.loginVersion;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -104,10 +110,10 @@ class _RegistrationPageState extends State<RegistrationPage> {
                 child: ElevatedButton(
                   onPressed: () {
                     setState(() {
-                      widget.loginVersion = !widget.loginVersion;
+                      loginVersion = !loginVersion;
                     });
                   },
-                  child: widget.loginVersion
+                  child: loginVersion
                       ? const Text('Switch to Register')
                       : const Text('Switch to Login'),
                 ),
