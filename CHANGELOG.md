@@ -1,5 +1,9 @@
 ## 1.2.1
 
+- Use the sqlite_wrapper 0.5.2 to fix gPRC problems
+
+## 1.2.1
+
 - Fixed missing await in select
 
 ## 1.2.0
