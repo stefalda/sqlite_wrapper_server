@@ -12,13 +12,17 @@ abstract class Constants {
   static late String secretKey;
 
   // Calls are unauthenticated so there's no USERS DB
-  static late bool runUnathenticated;
+  static late bool runUnauthenticated;
 
   /// Name of the database of authenticated users
   static late String usersDBName;
 
   /// Path to the authenticated users DB
   static late String usersDBPath;
+
+  /// Deprecated: use [runUnauthenticated] instead.
+  @Deprecated('Use runUnauthenticated instead')
+  static bool get runUnathenticated => runUnauthenticated;
 
   /// Path to where the application DB is stored
   static late String dbPath;
@@ -64,7 +68,7 @@ abstract class Constants {
     // Extract values
     serverPort = int.parse(argResults['port']);
     secretKey = argResults['secret_key'];
-    runUnathenticated = argResults['unauthenticated'] == 'true';
+    runUnauthenticated = argResults['unauthenticated'] == 'true';
     usersDBName = argResults['users_db_name'];
     usersDBPath = argResults['users_db_path'];
     dbPath = argResults['db_path'];

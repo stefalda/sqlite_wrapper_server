@@ -1,9 +1,23 @@
 import 'dart:convert';
 
 import 'package:crypto/crypto.dart';
+import 'package:cryptography_plus/cryptography_plus.dart';
 import 'package:inject_x/inject_x.dart';
 import 'package:sqlite_wrapper/sqlite_wrapper.dart';
 import 'package:uuid/uuid.dart';
+
+/// Argon2id instance for password hashing (OWASP recommended baseline).
+///
+/// memory: 19 MiB = 19456 x 1kB blocks
+/// iterations: 2
+/// parallelism: 1
+/// hashLength: 32 bytes
+final _argon2 = Argon2id(
+  parallelism: 1,
+  memory: 19456,
+  iterations: 2,
+  hashLength: 32,
+);
 
 class DatabaseService {
   /// Open or create the users database
@@ -18,6 +32,7 @@ class DatabaseService {
       email TEXT UNIQUE NOT NULL,
       password_hash TEXT NOT NULL,
       salt TEXT NOT NULL,
+      hash_algorithm TEXT DEFAULT 'sha256',
       created_at DATETIME DEFAULT current_timestamp
       );
 
@@ -37,73 +52,120 @@ class DatabaseService {
     return count > 0;
   }
 
-  /// Inser a new user
-  Future<void> insertUser(
-      {required String email,
-      required String password,
-      required String dbName}) async {
-    // Generate a random salt using secure methods or libraries like uuid.
+  /// Insert a new user and return the generated UUID.
+  Future<String> insertUser({
+    required String email,
+    required String password,
+    required String dbName,
+  }) async {
+    // Generate a random salt
     final salt = Uuid().v4();
 
-    // Combine the salt with the password before hashing
-    String digest = _getDigestValue(salt, password);
-
-    // Current timestamp for created_at field
-    //final createdAt = DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.now());
+    // Hash the password with Argon2id using the salt as nonce
+    final digest = await _argon2idHash(password, salt);
 
     // Prepare the SQL statement with placeholders
     const sqlInsertUser =
-        'INSERT INTO users (id, email, password_hash, salt) VALUES (?, ?, ?, ?);';
+        'INSERT INTO users (id, email, password_hash, salt, hash_algorithm) VALUES (?, ?, ?, ?, ?);';
 
-    // Use a UUID for the ID or let SQLite generate it if using `DEFAULT` in your table creation script.
+    // Use a UUID v7 for the ID
     final id = Uuid().v7();
 
     try {
       await inject<SQLiteWrapperBase>().execute(
         sqlInsertUser,
         params: [
-          id, // User's unique identifier
-          email, // Email address (unique)
-          digest, // Hashed password combined with salt
-          salt // The generated salt for this user
+          id,
+          email,
+          digest,
+          salt,
+          'argon2id',
         ],
         dbName: dbName,
       );
     } catch (e) {
-      print('Error inserting user: $e');
+      // UNIQUE constraint violation → rethrow as alreadyExists
+      rethrow;
     }
+    return id;
   }
 
-  /// Check if the password matched the hashed one
-  Future<bool> isLoginCorrect(
-      {required String email,
-      required String password,
-      required String dbName}) async {
-    const sql = 'SELECT salt, password_hash FROM users WHERE email = ?';
+  /// Verify login credentials and return (success, userId).
+  ///
+  /// Supports legacy SHA-256 hashes and migrates them to Argon2id on
+  /// successful verification.
+  Future<(bool, String?)> isLoginCorrect({
+    required String email,
+    required String password,
+    required String dbName,
+  }) async {
+    const sql = 'SELECT id, salt, password_hash, hash_algorithm FROM users WHERE email = ?';
     final res = await inject<SQLiteWrapperBase>()
         .query(sql, params: [email], singleResult: true, dbName: dbName);
-    // Check if a user was found
-    if (res == null || res.length < 2) {
-      return false; // No such user or incomplete data returned
+    if (res == null) return (false, null);
+
+    final storedHash = res['password_hash'] as String;
+    final salt = res['salt'] as String;
+    final hashAlgo = res['hash_algorithm'] as String? ?? 'sha256';
+    final userId = res['id'] as String;
+
+    if (hashAlgo == 'sha256') {
+      // Legacy SHA-256 verification
+      final incomingDigest = _sha256Digest(salt, password);
+      if (!_secureCompare(storedHash, incomingDigest)) {
+        return (false, null);
+      }
+      // Migrate to Argon2id on successful login
+      final newHash = await _argon2idHash(password, salt);
+      await inject<SQLiteWrapperBase>().execute(
+        'UPDATE users SET password_hash = ?, hash_algorithm = ? WHERE id = ?',
+        params: [newHash, 'argon2id', userId],
+        dbName: dbName,
+      );
+      return (true, userId);
     }
 
-    final String salt = res[0];
-    final storedDigest = res[1];
-    final incomingDigest = _getDigestValue(salt, password);
-    return _secureCompare(storedDigest, incomingDigest);
+    // Argon2id verification
+    final match = await _argon2idVerify(password, salt, storedHash);
+    return (match, match ? userId : null);
   }
 
-  String _getDigestValue(String salt, String password) {
-    // Combine the salt with the password before hashing
-    final combinedPassword = '$salt$password';
+  /// Hash a password with Argon2id using [salt] as nonce.
+  /// Returns the hex-encoded hash.
+  Future<String> _argon2idHash(String password, String salt) async {
+    final secretKey = SecretKey(utf8.encode(password));
+    final nonce = utf8.encode(salt);
+    final derivedKey = await _argon2.deriveKey(
+      secretKey: secretKey,
+      nonce: nonce,
+    );
+    final bytes = await derivedKey.extractBytes();
+    return base64Encode(bytes);
+  }
 
-    // Convert to UTF-8 and hash using SHA-256
+  /// Verify a password against a stored Argon2id hash.
+  Future<bool> _argon2idVerify(
+      String password, String salt, String storedHash) async {
+    final secretKey = SecretKey(utf8.encode(password));
+    final nonce = utf8.encode(salt);
+    final derivedKey = await _argon2.deriveKey(
+      secretKey: secretKey,
+      nonce: nonce,
+    );
+    final bytes = await derivedKey.extractBytes();
+    final computedHash = base64Encode(bytes);
+    return _secureCompare(storedHash, computedHash);
+  }
+
+  /// Legacy SHA-256 digest used during migration.
+  String _sha256Digest(String salt, String password) {
+    final combinedPassword = '$salt$password';
     final bytes = utf8.encode(combinedPassword);
     final digest = sha256.convert(bytes);
     return digest.toString();
   }
 
-// Constant-time string comparison function to prevent timing attacks
+  // Constant-time string comparison to prevent timing attacks
   bool _secureCompare(String a, String b) {
     if (a.length != b.length) {
       return false;

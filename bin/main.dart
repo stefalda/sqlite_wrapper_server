@@ -14,6 +14,11 @@ import 'package:sqlite_wrapper_server/sqlite_wrapper_server.dart';
 Future<void> main(List<String> args) async {
   // Parse arguments
   Constants.parse(args);
+
+  // Set unauthenticated mode BEFORE server.serve() to close the race window
+  // (R3c).
+  SQLiteWrapperServerImpl.runUnauthenticated = Constants.runUnauthenticated;
+
   // Load the service
   InjectX.add<SQLiteWrapperBase>(SQLiteWrapperCore());
   final databaseService = InjectX.add(DatabaseService());
@@ -23,12 +28,6 @@ Future<void> main(List<String> args) async {
   final server = Server.create(
       services: [SQLiteWrapperServerImpl(), AuthServiceImpl()],
       interceptors: [authInterceptor]);
-
-  // Start the server on port 50051 without TLS.
-  final port = Constants.serverPort;
-  await server.serve(port: port);
-  // Disable token authentication
-  SQLiteWrapperServerImpl.runUnauthenticated = Constants.runUnathenticated;
 
   if (!SQLiteWrapperServerImpl.runUnauthenticated) {
     // Check that the secret key is set
@@ -42,6 +41,10 @@ Future<void> main(List<String> args) async {
   // Open or create the user DB
   await databaseService.openDatabase(
       path: Constants.usersDBPath, name: Constants.usersDBName);
+
+  // Start the server on the configured port without TLS.
+  final port = Constants.serverPort;
+  await server.serve(port: port);
 
 // Handle program termination (Ctrl+C or process kill)
   ProcessSignal.sigint.watch().listen((_) async {

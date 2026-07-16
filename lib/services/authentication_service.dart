@@ -17,13 +17,17 @@ class AuthenticationService {
     return jwt.payload['userid'] as String;
   }
 
-  /// Genereate the token and return to user
+  /// Generate the token and return to user.
+  ///
+  /// Uses Unix timestamps (seconds) for `iat` and adds `exp` at 24 hours.
   String generateToken({required String email, required String userid}) {
+    final now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
     final jwt = JWT(
       {
         'userid': userid,
         'email': email,
-        'iat': DateTime.now().millisecondsSinceEpoch,
+        'iat': now,
+        'exp': now + 86400,
       },
     );
     return jwt.sign(SecretKey(_jwtSecret));

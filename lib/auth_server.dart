@@ -13,50 +13,41 @@ class AuthServiceImpl extends AuthServiceBase {
   Future<AuthResponse> register(
       ServiceCall call, RegisterRequest request) async {
     final dbName = Constants.usersDBName;
-    if (await databaseService.emailAlreadyRegistered(request.email,
-        dbName: dbName)) {
+    // insertUser throws on duplicate email (UNIQUE constraint)
+    // We catch the error and return a uniform message to prevent enumeration.
+    try {
+      final userid = await databaseService.insertUser(
+          email: request.email, password: request.password, dbName: dbName);
+      final token = authenticationService.generateToken(
+          email: request.email, userid: userid);
+
+      return AuthResponse()
+        ..success = true
+        ..message = 'Registration successful'
+        ..token = token;
+    } catch (e) {
       return AuthResponse()
         ..success = false
-        ..message = 'Email already registered';
+        ..message = 'Invalid email or password';
     }
-
-    await databaseService.insertUser(
-        email: request.email, password: request.password, dbName: dbName);
-
-    // Generate JWT token
-    final userid =
-        await databaseService.getUserId(email: request.email, dbName: dbName);
-    final token = authenticationService.generateToken(
-        email: request.email, userid: userid);
-
-    return AuthResponse()
-      ..success = true
-      ..message = 'Registration successful'
-      ..token = token;
   }
 
+  /// Login uses the unified single-query isLoginCorrect which returns
+  /// (correct, userId) in one round-trip.
+  ///
+  /// Both "user not found" and "wrong password" produce the same message
+  /// to prevent email enumeration (R7).
   @override
   Future<AuthResponse> login(ServiceCall call, LoginRequest request) async {
     final dbName = Constants.usersDBName;
-    if (!await databaseService.emailAlreadyRegistered(request.email,
-        dbName: dbName)) {
+    final (correct, userid) = await databaseService.isLoginCorrect(
+        email: request.email, password: request.password, dbName: dbName);
+    if (!correct || userid == null) {
       return AuthResponse()
         ..success = false
-        ..message = 'User not found';
+        ..message = 'Invalid email or password';
     }
 
-    // Verify password
-
-    if (!await databaseService.isLoginCorrect(
-        email: request.email, password: request.password, dbName: dbName)) {
-      return AuthResponse()
-        ..success = false
-        ..message = 'Invalid password';
-    }
-
-    // Generate JWT token
-    final userid =
-        await databaseService.getUserId(email: request.email, dbName: dbName);
     final token = authenticationService.generateToken(
         email: request.email, userid: userid);
 
