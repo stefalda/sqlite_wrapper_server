@@ -167,8 +167,12 @@ services:
         volumes:
             - ./data:/data
         environment:
+            PORT: 50051
             SECRET_KEY: "a1b2c33d4e5f6g7h8i9jakblc"
             UNAUTHENTICATED: false
+            USERS_DB_NAME: users
+            USERS_DB_PATH: /data
+            DB_PATH: /data
             SHARED_DB: false
 
     envoy:
