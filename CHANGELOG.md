@@ -1,6 +1,25 @@
+## 1.2.5
+
+- **Configurable database name:** `dbName` can now be passed as a CLI argument
+  (`--dbname`) or via `DB_NAME` env variable, defaulting to `users`. Added
+  `DB_PATH` env variable to override the data directory. Cleans up `.vscode/settings.json`.
+
+## 1.2.4
+
+- **Refresh token support with rotation and expiration:** The server now issues
+  refresh tokens alongside access tokens. On refresh, the old token is invalidated
+  and a new refresh/access token pair is issued. Added
+  `AuthenticationService.refreshToken()` and the corresponding `RefreshToken` gRPC
+  endpoint. Requires `sqlite_wrapper` ^0.5.3.
+
+## 1.2.3
+
+- Fixed `ENV` variable handling in `Dockerfile` and `compose.yaml` for server
+  configuration (`DB_HOST`, `DB_PORT`, `AUTH_SECRET`, `JWT_EXPIRATION`).
+
 ## 1.2.2
 
-- Use the sqlite_wrapper 0.5.2 to fix gPRC problems
+- Use sqlite_wrapper 0.5.2 to fix gRPC problems
 
 ## 1.2.1
 
