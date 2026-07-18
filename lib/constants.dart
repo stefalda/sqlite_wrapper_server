@@ -31,6 +31,11 @@ abstract class Constants {
   /// otherwise every DB will be specific to a user
   static late bool sharedDB;
 
+  /// Optional override for the application DB name prefix.
+  /// If set, the user databases will be named as {dbName}_{uuid}.
+  /// Defaults to the dbName sent by the client ("mainDB").
+  static String? dbName;
+
   static void parse(List<String> arguments) {
     final parser = ArgParser()
       ..addOption('port',
@@ -48,6 +53,9 @@ abstract class Constants {
       ..addOption('users_db_path',
           help: 'Path to the database of authenticated users  (./ is default)',
           defaultsTo: "./")
+      ..addOption('db_name',
+          help: 'Override the application DB name prefix (default: client-supplied "mainDB")',
+          defaultsTo: '')
       ..addOption('db_path',
           help: 'Path where databases are stored (./ is default)',
           defaultsTo: "./")
@@ -71,6 +79,9 @@ abstract class Constants {
     runUnauthenticated = argResults['unauthenticated'] == 'true';
     usersDBName = argResults['users_db_name'];
     usersDBPath = argResults['users_db_path'];
+    dbName = (argResults['db_name'] as String).isNotEmpty
+        ? argResults['db_name'] as String
+        : null;
     dbPath = argResults['db_path'];
     sharedDB = argResults['shared_db'] == 'true';
   }

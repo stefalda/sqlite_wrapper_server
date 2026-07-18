@@ -49,6 +49,7 @@ include:
 | `unauthenticated` | Allows unauthenticated access                | false         |
 | `users_db_name`   | Name of the database for authenticated users | users         |
 | `users_db_path`   | Path to the authenticated users DB           | ./            |
+| `db_name`         | Override the app DB name prefix (default: client-supplied "mainDB") |              |
 | `db_path`         | Path where application databases are stored  | ./            |
 | `shared_db`       | If true, a single shared database is used    | false         |
 
@@ -172,6 +173,7 @@ services:
             UNAUTHENTICATED: false
             USERS_DB_NAME: users
             USERS_DB_PATH: /data
+            DB_NAME: ""
             DB_PATH: /data
             SHARED_DB: false
 
@@ -190,6 +192,9 @@ Build and run the Docker containers:
 
 ```bash
 docker compose up
+
+# Override the app DB name prefix:
+# DB_NAME=babibooks docker compose up
 ```
 
 ## Usage

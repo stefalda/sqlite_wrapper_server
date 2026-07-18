@@ -4,3 +4,4 @@
 *.sqlite
 build/
 data/
+.vscode/settings.json

@@ -1,4 +1,4 @@
-## 1.2.1
+## 1.2.2
 
 - Use the sqlite_wrapper 0.5.2 to fix gPRC problems
 

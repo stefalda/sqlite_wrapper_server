@@ -40,6 +40,6 @@ COPY --from=build /data /data
 
 # Start server.
 EXPOSE 50051
-CMD ["/bin/sh", "-c", "/app/bin/server --port \"${PORT:-50051}\" --secret_key \"$SECRET_KEY\" --unauthenticated \"${UNAUTHENTICATED:-false}\" --users_db_name \"${USERS_DB_NAME:-users}\" --users_db_path \"${USERS_DB_PATH:-/data}\" --db_path \"${DB_PATH:-/data}\" --shared_db \"${SHARED_DB:-false}\""]
+CMD ["/bin/sh", "-c", "/app/bin/server --port \"${PORT:-50051}\" --secret_key \"$SECRET_KEY\" --unauthenticated \"${UNAUTHENTICATED:-false}\" --users_db_name \"${USERS_DB_NAME:-users}\" --users_db_path \"${USERS_DB_PATH:-/data}\" --db_name \"${DB_NAME:-}\" --db_path \"${DB_PATH:-/data}\" --shared_db \"${SHARED_DB:-false}\""]
 
 

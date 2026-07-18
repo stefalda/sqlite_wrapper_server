@@ -17,6 +17,7 @@ class SQLiteWrapperServerImpl extends SqliteWrapperServiceBase {
   }
 
   /// The DB Name is created appending to the dbName the user UUID.
+  /// If Constants.dbName is set, it overrides the client-supplied dbName.
   String _getDBName({required ServiceCall call, required String dbName}) {
     final String? uuid = call.clientMetadata!['user_uuid'];
     if (uuid == null) {
@@ -27,7 +28,8 @@ class SQLiteWrapperServerImpl extends SqliteWrapperServiceBase {
             'User not authenticated for non-shared database');
       }
     }
-    return "${dbName}_$uuid";
+    final prefix = Constants.dbName ?? dbName;
+    return "${prefix}_$uuid";
   }
 
   String _getDBPath(String dbName) {
