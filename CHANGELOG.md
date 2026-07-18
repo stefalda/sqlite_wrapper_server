@@ -1,8 +1,14 @@
+## 1.2.6
+
+- Added `BytesValue` support in `_unpack()` for deserializing binary data
+  (`Uint8List` → `List<int>`) sent as gRPC parameters, fixing cover image
+  inserts on web clients.
+
 ## 1.2.5
 
 - **Configurable database name:** `dbName` can now be passed as a CLI argument
-  (`--dbname`) or via `DB_NAME` env variable, defaulting to `users`. Added
-  `DB_PATH` env variable to override the data directory. Cleans up `.vscode/settings.json`.
+  (`--db_name`) or via `DB_NAME` env variable, defaulting to the client-supplied
+  `dbName`. Added `DB_PATH` env variable to override the data directory.
 
 ## 1.2.4
 

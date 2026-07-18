@@ -168,6 +168,8 @@ class SQLiteWrapperServerImpl extends SqliteWrapperServiceBase {
         return any.unpackInto(BoolValue()).value;
       } else if (any.typeUrl.endsWith('DoubleValue')) {
         return any.unpackInto(DoubleValue()).value.toDouble();
+      } else if (any.typeUrl.endsWith('BytesValue')) {
+        return any.unpackInto(BytesValue()).value;
       } else if (any.typeUrl == '') {
         return null;
       }
