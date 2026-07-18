@@ -1,6 +1,6 @@
 name: sqlite_wrapper_server
 description: Dart-based gRPC server for remote SQLite database access with user authentication.
-version: 1.2.3
+version: 1.2.4
 # repository: https://github.com/my_org/my_repo
 
 environment:
@@ -8,7 +8,7 @@ environment:
 
 # Add regular dependencies here.
 dependencies:
-  sqlite_wrapper: ^0.5.2
+  sqlite_wrapper: ^0.5.3
   grpc: ^5.1.0
   protobuf: ^6.0.0
   crypto: ^3.0.0

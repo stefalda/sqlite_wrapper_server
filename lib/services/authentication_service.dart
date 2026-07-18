@@ -1,5 +1,6 @@
 import 'package:dart_jsonwebtoken/dart_jsonwebtoken.dart';
 import 'package:sqlite_wrapper_server/constants.dart';
+import 'package:uuid/uuid.dart';
 
 class AuthenticationService {
   final String _jwtSecret = Constants.secretKey;
@@ -31,5 +32,11 @@ class AuthenticationService {
       },
     );
     return jwt.sign(SecretKey(_jwtSecret));
+  }
+
+  /// Generate a cryptographically random refresh token (opaque string).
+  /// Refresh tokens are stored server-side and do not use JWT.
+  String generateRefreshToken() {
+    return Uuid().v4();
   }
 }

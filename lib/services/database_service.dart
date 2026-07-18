@@ -36,8 +36,17 @@ class DatabaseService {
       created_at DATETIME DEFAULT current_timestamp
       );
 
-      -- Create an index on the email column to improve lookup performance
       CREATE INDEX IF NOT EXISTS idx_email ON users(email);
+
+      CREATE TABLE IF NOT EXISTS refresh_tokens (
+        token TEXT PRIMARY KEY,
+        user_uuid TEXT NOT NULL,
+        email TEXT NOT NULL,
+        expires_at DATETIME NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_refresh_token_email ON refresh_tokens(email);
       """;
       await inject<SQLiteWrapperBase>().execute(sql, dbName: name);
     }, dbName: name);
@@ -192,5 +201,45 @@ class DatabaseService {
     final sql = "SELECT id FROM users WHERE email = ?";
     return await inject<SQLiteWrapperBase>()
         .query(sql, params: [email], singleResult: true, dbName: dbName);
+  }
+
+  /// Save a refresh token for the user with a 30-day expiration.
+  Future<void> saveRefreshToken({
+    required String token,
+    required String userUuid,
+    required String email,
+    required String dbName,
+  }) async {
+    final expiresAt = DateTime.now().add(const Duration(days: 30)).toIso8601String();
+    const sql = '''INSERT OR REPLACE INTO refresh_tokens (token, user_uuid, email, expires_at)
+                    VALUES (?, ?, ?, ?)''';
+    await inject<SQLiteWrapperBase>().execute(
+      sql,
+      params: [token, userUuid, email, expiresAt],
+      dbName: dbName,
+    );
+  }
+
+  /// Retrieve a refresh token row, or null if not found.
+  Future<Map<String, dynamic>?> getRefreshToken({
+    required String token,
+    required String dbName,
+  }) async {
+    const sql = 'SELECT token, user_uuid, email, expires_at FROM refresh_tokens WHERE token = ?';
+    return await inject<SQLiteWrapperBase>().query(
+      sql,
+      params: [token],
+      singleResult: true,
+      dbName: dbName,
+    );
+  }
+
+  /// Delete a refresh token (used during rotation or expiry).
+  Future<void> deleteRefreshToken({
+    required String token,
+    required String dbName,
+  }) async {
+    const sql = 'DELETE FROM refresh_tokens WHERE token = ?';
+    await inject<SQLiteWrapperBase>().execute(sql, params: [token], dbName: dbName);
   }
 }
