@@ -103,6 +103,11 @@ class DatabaseService {
   ///
   /// Supports legacy SHA-256 hashes and migrates them to Argon2id on
   /// successful verification.
+  /// Returns (correct, userId).
+  ///
+  /// - `(false, null)` — email not found.
+  /// - `(false, userId)` — email found but wrong password.
+  /// - `(true, userId)` — correct credentials.
   Future<(bool, String?)> isLoginCorrect({
     required String email,
     required String password,
@@ -113,16 +118,17 @@ class DatabaseService {
         .query(sql, params: [email], singleResult: true, dbName: dbName);
     if (res == null) return (false, null);
 
+    final userId = res['id'] as String;
+
     final storedHash = res['password_hash'] as String;
     final salt = res['salt'] as String;
     final hashAlgo = res['hash_algorithm'] as String? ?? 'sha256';
-    final userId = res['id'] as String;
 
     if (hashAlgo == 'sha256') {
       // Legacy SHA-256 verification
       final incomingDigest = _sha256Digest(salt, password);
       if (!_secureCompare(storedHash, incomingDigest)) {
-        return (false, null);
+        return (false, userId);
       }
       // Migrate to Argon2id on successful login
       final newHash = await _argon2idHash(password, salt);
@@ -136,7 +142,7 @@ class DatabaseService {
 
     // Argon2id verification
     final match = await _argon2idVerify(password, salt, storedHash);
-    return (match, match ? userId : null);
+    return (match, userId);
   }
 
   /// Hash a password with Argon2id using [salt] as nonce.

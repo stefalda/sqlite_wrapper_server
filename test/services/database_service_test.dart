@@ -108,7 +108,7 @@ void main() {
       expect(userId, isNull);
     });
 
-    test('returns (false, null) for wrong password with SHA-256 user',
+    test('returns (false, userId) for wrong password with SHA-256 user',
         () async {
       final (correct, userId) = await databaseService.isLoginCorrect(
         email: 'test@example.com',
@@ -116,7 +116,7 @@ void main() {
         dbName: 'test_users',
       );
       expect(correct, isFalse);
-      expect(userId, isNull);
+      expect(userId, isNotNull);
     });
   });
 }

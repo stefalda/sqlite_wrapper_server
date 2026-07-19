@@ -4,14 +4,12 @@ import 'package:sqlite_wrapper_sample/services/database_service.dart';
 
 class RegistrationInfo {
   String? email;
-  String? password;
   String? token;
+  String? refreshToken;
 
   bool get isRegistered =>
       email != null &&
       email!.isNotEmpty &&
-      password != null &&
-      password!.isNotEmpty &&
       token != null &&
       token!.isNotEmpty;
 }
@@ -23,8 +21,8 @@ class RegistrationInfoService {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     registrationInfo = RegistrationInfo()
       ..email = prefs.getString("email")
-      ..password = prefs.getString("password")
-      ..token = prefs.getString("token");
+      ..token = prefs.getString("token")
+      ..refreshToken = prefs.getString("refreshToken");
     _setTokenValue();
     return registrationInfo;
   }
@@ -32,24 +30,24 @@ class RegistrationInfoService {
   Future<void> setRegistrationInfo() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     prefs.setString("email", registrationInfo.email ?? "");
-    prefs.setString("password", registrationInfo.password ?? "");
     prefs.setString("token", registrationInfo.token ?? "");
+    prefs.setString("refreshToken", registrationInfo.refreshToken ?? "");
     _setTokenValue();
   }
 
   Future<void> registerOrLogin(
       {required String email, required String password, login = false}) async {
     final authClient = inject<DatabaseService>().database.authClient;
-    late String token;
-    if (login) {
-      token = await authClient.login(email, password);
-    } else {
-      token = await authClient.register(email, password);
+    final response = login
+        ? await authClient.login(email, password)
+        : await authClient.register(email, password);
+    if (!response.success) {
+      throw Exception(response.message);
     }
     registrationInfo
       ..email = email
-      ..password = password
-      ..token = token;
+      ..token = response.token
+      ..refreshToken = response.refreshToken;
     await setRegistrationInfo();
   }
 

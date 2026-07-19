@@ -87,18 +87,26 @@ class _RegistrationPageState extends State<RegistrationPage> {
               ElevatedButton(
                 onPressed: () async {
                   if (_formKey.currentState!.validate()) {
-                    // Process registration
-                    await inject<RegistrationInfoService>().registerOrLogin(
-                        email: email,
-                        password: password,
-                        login: widget.loginVersion);
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                            content: Text('Registration/Login successful')),
-                      );
+                    try {
+                      await inject<RegistrationInfoService>().registerOrLogin(
+                          email: email,
+                          password: password,
+                          login: widget.loginVersion);
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                              content:
+                                  Text('Registration/Login successful')),
+                        );
+                      }
+                      widget.onLogin();
+                    } catch (e) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
+                        );
+                      }
                     }
-                    widget.onLogin();
                   }
                 },
                 child: widget.loginVersion

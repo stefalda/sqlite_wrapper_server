@@ -30,12 +30,16 @@ class AuthServiceImpl extends AuthServiceBase {
 
       return AuthResponse()
         ..success = true
+        ..errorCode = 0
         ..message = 'Registration successful'
         ..token = token
         ..refreshToken = refreshToken;
     } catch (e) {
+      final msg = e.toString();
+      final errorCode = msg.contains('UNIQUE') ? 3 : -1;
       return AuthResponse()
         ..success = false
+        ..errorCode = errorCode
         ..message = 'Invalid email or password';
     }
   }
@@ -45,14 +49,15 @@ class AuthServiceImpl extends AuthServiceBase {
     final dbName = Constants.usersDBName;
     final (correct, userid) = await databaseService.isLoginCorrect(
         email: request.email, password: request.password, dbName: dbName);
-    if (!correct || userid == null) {
+    if (!correct) {
       return AuthResponse()
         ..success = false
+        ..errorCode = userid == null ? 1 : 2
         ..message = 'Invalid email or password';
     }
 
     final token = authenticationService.generateToken(
-        email: request.email, userid: userid);
+        email: request.email, userid: userid!);
     final refreshToken = authenticationService.generateRefreshToken();
 
     await databaseService.saveRefreshToken(
@@ -64,6 +69,7 @@ class AuthServiceImpl extends AuthServiceBase {
 
     return AuthResponse()
       ..success = true
+      ..errorCode = 0
       ..message = 'Login successful'
       ..token = token
       ..refreshToken = refreshToken;

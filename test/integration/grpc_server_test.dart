@@ -90,6 +90,7 @@ void main() {
         password: 'StrongP@ss1',
       ));
       expect(registerResponse.success, isTrue);
+      expect(registerResponse.errorCode, 0);
       expect(registerResponse.message, 'Registration successful');
       expect(registerResponse.token, isNotEmpty);
 
@@ -98,6 +99,7 @@ void main() {
         password: 'StrongP@ss1',
       ));
       expect(loginResponse.success, isTrue);
+      expect(loginResponse.errorCode, 0);
       expect(loginResponse.message, 'Login successful');
       expect(loginResponse.token, isNotEmpty);
     });
@@ -112,6 +114,7 @@ void main() {
         password: 'Password1',
       ));
       expect(response.success, isFalse);
+      expect(response.errorCode, 3);
       expect(response.message, 'Invalid email or password');
     });
 
@@ -125,6 +128,7 @@ void main() {
         password: 'WrongPw1',
       ));
       expect(response.success, isFalse);
+      expect(response.errorCode, 2);
       expect(response.message, 'Invalid email or password');
     });
 
@@ -134,6 +138,7 @@ void main() {
         password: 'anyPass1',
       ));
       expect(response.success, isFalse);
+      expect(response.errorCode, 1);
       expect(response.message, 'Invalid email or password');
     });
   });

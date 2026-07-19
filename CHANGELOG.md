@@ -1,3 +1,7 @@
+## 1.2.7
+
+- Changes in gRPC authentication 
+
 ## 1.2.6
 
 - Added `BytesValue` support in `_unpack()` for deserializing binary data
