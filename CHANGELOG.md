@@ -1,3 +1,17 @@
+## 1.3.0
+
+- **Breaking**: `SqlQueryRequest.params` changed from `repeated google.protobuf.Any`
+  to `repeated Param` (compact oneof). Replaced `_unpack()` with `_unpackParams()`.
+- **Breaking**: `SqlQueryResponse.result` changed from `string result` (JSON)
+  to `repeated Row rows` + `Value result` (structured protobuf). Added helper
+  methods `_valueFromDart()`, `_rowsFromMaps()`.
+- **New**: `ExecuteBatch` RPC for processing multiple SQL statements in a single
+  round-trip. Statements are executed sequentially via the `DatabasePool`.
+- **New**: gRPC compression support — `CodecRegistry(codecs: [GzipCodec()])`
+  enables gzip compression for both requests and responses on native platforms.
+- Updated generated Dart stubs from proto.
+- Added `fixnum` and `dependency_overrides` for local `sqlite_wrapper` path.
+
 ## 1.2.7
 
 - Changes in gRPC authentication 

@@ -138,7 +138,7 @@ packages:
     source: hosted
     version: "7.0.1"
   fixnum:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: fixnum
       sha256: b6dc7065e46c974bc7c5f143080a6764ec7a4be6da1285ececdc37be96de53be
@@ -461,10 +461,10 @@ packages:
     dependency: "direct main"
     description:
       name: sqlite_wrapper
-      sha256: "5faece337c36f148d36c1520529ab0fdfe35aa74af0f37275f97f255afe16278"
+      sha256: "900148489ee7d7e944f9e0f9b26f85a569dba1ccbe9588db466cba24d49554d9"
       url: "https://pub.dev"
     source: hosted
-    version: "0.5.6"
+    version: "0.6.0"
   stack_trace:
     dependency: transitive
     description:

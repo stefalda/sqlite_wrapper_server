@@ -18,6 +18,14 @@ database storage.
   the provided `dbName` with their unique UUID.
 - **Connection pooling:** All RPCs share a static `DatabasePool` with reference
   counting, eliminating file-descriptor churn under concurrent load.
+- **Efficient binary protocol (v1.3.0+):** Replaced `google.protobuf.Any` params
+  with a compact `Param` oneof and JSON-encoded results with structured `Row`/
+  `Value` messages. Reduces payload size by 60–80%.
+- **Batch execution (v1.3.0+):** The new `ExecuteBatch` RPC processes multiple
+  SQL statements in a single round-trip, reducing latency for composite
+  operations.
+- **gRPC compression (v1.3.0+):** gzip compression is enabled for both request
+  and response messages on native platforms via `GzipCodec` + `CodecRegistry`.
 - **Real-time Watch (Server-Streaming gRPC):** Subscribe to SQL queries via the
   `Watch` RPC and receive push updates whenever any client modifies the watched
   tables. The server uses a reference-counted connection pool so that mutations
@@ -208,6 +216,27 @@ unique UUID, stored in the local users database.
 
 Authenticated users have their own SQLite databases named by combining `dbName`
 with their assigned UUID.
+
+### Batch Execution (v1.3.0+)
+
+Clients can batch multiple SQL statements in a single round-trip using the
+`ExecuteBatch` RPC. The server processes each statement sequentially and
+returns the results in order. This is exposed via `SqliteWrapperGRPC.executeBatch()`.
+
+```dart
+final results = await db.executeBatch([
+  "INSERT INTO publishers (publishername, publisherid) VALUES (?, ?)",
+  "INSERT INTO authors (authorname, authorid) VALUES (?, ?)",
+  "INSERT INTO books (title, authorid, publisherid, bookid) VALUES (?, ?, ?, ?)",
+], paramsList: [
+  ["John Wiley", "pub-123"],
+  ["J. R. R. Tolkien", "auth-456"],
+  ["The Hobbit", "auth-456", "pub-123", "book-789"],
+]);
+// results[0] → last_insert_rowid for publisher
+// results[1] → last_insert_rowid for author
+// results[2] → last_insert_rowid for book
+```
 
 ### Real-time Watch (gRPC Server-Streaming)
 

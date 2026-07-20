@@ -27,7 +27,8 @@ Future<void> main(List<String> args) async {
   // Create the gRPC server with the service implementation and authentication interceptor.
   final server = Server.create(
       services: [SQLiteWrapperServerImpl(), AuthServiceImpl()],
-      interceptors: [authInterceptor]);
+      interceptors: [authInterceptor],
+      codecRegistry: CodecRegistry(codecs: [GzipCodec()]));
 
   if (!SQLiteWrapperServerImpl.runUnauthenticated) {
     // Check that the secret key is set

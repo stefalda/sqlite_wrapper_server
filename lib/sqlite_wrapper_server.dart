@@ -1,9 +1,8 @@
 import 'dart:async';
-import 'dart:convert';
+import 'dart:typed_data';
 
+import 'package:fixnum/fixnum.dart';
 import 'package:grpc/grpc.dart';
-import 'package:protobuf/well_known_types/google/protobuf/any.pb.dart';
-import 'package:protobuf/well_known_types/google/protobuf/wrappers.pb.dart';
 import 'package:sqlite_wrapper/sqlite_wrapper.dart';
 import 'package:sqlite_wrapper_server/constants.dart';
 import 'package:sqlite_wrapper_server/database_pool.dart';
@@ -90,15 +89,15 @@ class SQLiteWrapperServerImpl extends SqliteWrapperServiceBase {
       ServiceCall call, SqlQueryRequest request) async {
     final String dbName = _getDBName(call: call, dbName: request.dbName);
     print(
-        "Execute called: sql=${request.sql}, params=${request.params}, dbName=$dbName");
+        "Execute called: sql=${request.sql}, params=$_printParams(request.params), dbName=$dbName");
     final pool = DatabasePool.get(dbName, _getDBPath(dbName));
     try {
       final res = await _runWithRetry(() => pool.execute(
             request.sql,
-            params: _unpack(request.params.toList()),
+            params: _unpackParams(request.params),
             tables: request.tables,
           ));
-      return SqlQueryResponse(result: jsonEncode(res));
+      return SqlQueryResponse(result: _valueFromDart(res));
     } catch (e) {
       if (e is GrpcError && e.code == StatusCode.unavailable) rethrow;
       throw GrpcError.invalidArgument('SQL execution error: $e');
@@ -112,7 +111,7 @@ class SQLiteWrapperServerImpl extends SqliteWrapperServiceBase {
       ServiceCall call, SqlQueryRequest request) async {
     final String dbName = _getDBName(call: call, dbName: request.dbName);
     print(
-        "Select called: sql=${request.sql}, params=${request.params}, dbName=$dbName");
+        "Select called: sql=${request.sql}, params=$_printParams(request.params), dbName=$dbName");
     final pool = DatabasePool.get(dbName, _getDBPath(dbName));
     try {
       final db = pool.getDatabase();
@@ -120,10 +119,41 @@ class SQLiteWrapperServerImpl extends SqliteWrapperServiceBase {
         throw GrpcError.failedPrecondition('Database not opened');
       }
       final res = await db
-          .select(request.sql, _unpack(request.params.toList()));
-      return SqlQueryResponse(result: jsonEncode(res));
+          .select(request.sql, _unpackParams(request.params));
+      return SqlQueryResponse(rows: _rowsFromMaps(res));
     } catch (e) {
       throw GrpcError.invalidArgument('SQL query error: $e');
+    } finally {
+      DatabasePool.close(dbName);
+    }
+  }
+
+  @override
+  Future<BatchResponse> executeBatch(
+      ServiceCall call, BatchRequest request) async {
+    print("ExecuteBatch called: count=${request.requests.length}");
+    if (request.requests.isEmpty) {
+      return BatchResponse();
+    }
+
+    // All requests share the same dbName (from the first request).
+    final first = request.requests.first;
+    final String dbName = _getDBName(call: call, dbName: first.dbName);
+    final pool = DatabasePool.get(dbName, _getDBPath(dbName));
+
+    try {
+      final responses = <SqlQueryResponse>[];
+      for (final req in request.requests) {
+        final res = await pool.execute(
+          req.sql,
+          params: _unpackParams(req.params),
+          tables: req.tables,
+        );
+        responses.add(SqlQueryResponse(result: _valueFromDart(res)));
+      }
+      return BatchResponse(responses: responses);
+    } catch (e) {
+      throw GrpcError.invalidArgument('Batch execution error: $e');
     } finally {
       DatabasePool.close(dbName);
     }
@@ -141,40 +171,100 @@ class SQLiteWrapperServerImpl extends SqliteWrapperServiceBase {
       dbName: dbName,
       dbPath: dbPath,
       sql: request.sql,
-      params: _unpack(request.params.toList()),
+      params: _unpackParams(request.params),
       tables: request.tables,
       singleResult: request.singleResult,
     );
 
     try {
       await for (final result in stream) {
-        yield WatchResponse(
-          json: jsonEncode(result),
-          singleResult: request.singleResult,
-        );
+        if (request.singleResult) {
+          if (result is Map<String, dynamic>) {
+            yield WatchResponse(
+              rows: _rowsFromMaps([result]),
+              singleResult: true,
+            );
+          } else {
+            yield WatchResponse(
+              result: _valueFromDart(result),
+              singleResult: true,
+            );
+          }
+        } else if (result is List<Map<String, dynamic>>) {
+          yield WatchResponse(
+            rows: _rowsFromMaps(result),
+            singleResult: false,
+          );
+        } else if (result is Map<String, dynamic>) {
+          yield WatchResponse(
+            rows: _rowsFromMaps([result]),
+            singleResult: false,
+          );
+        } else {
+          yield WatchResponse(
+            result: _valueFromDart(result),
+            singleResult: false,
+          );
+        }
       }
     } finally {
       DatabasePool.unsubscribe(dbName);
     }
   }
 
-  List<Object?> _unpack(List<Any> params) {
-    return params.map((any) {
-      if (any.typeUrl.endsWith('Int64Value')) {
-        return any.unpackInto(Int64Value()).value.toInt();
-      } else if (any.typeUrl.endsWith('StringValue')) {
-        return any.unpackInto(StringValue()).value;
-      } else if (any.typeUrl.endsWith('BoolValue')) {
-        return any.unpackInto(BoolValue()).value;
-      } else if (any.typeUrl.endsWith('DoubleValue')) {
-        return any.unpackInto(DoubleValue()).value.toDouble();
-      } else if (any.typeUrl.endsWith('BytesValue')) {
-        return any.unpackInto(BytesValue()).value;
-      } else if (any.typeUrl == '') {
-        return null;
+  // ==================== Helper methods ====================
+
+  String _printParams(Iterable<Param> params) {
+    return "[${params.map((p) {
+      switch (p.whichValue()) {
+        case Param_Value.stringValue: return "'${p.stringValue}'";
+        case Param_Value.intValue: return p.intValue.toString();
+        case Param_Value.doubleValue: return p.doubleValue.toString();
+        case Param_Value.boolValue: return p.boolValue.toString();
+        case Param_Value.bytesValue: return "BLOB(${p.bytesValue.length})";
+        case Param_Value.notSet: return "null";
       }
-      throw ArgumentError('Unknown type: ${any.typeUrl}');
+    }).join(", ")}]";
+  }
+
+  /// Unpack a list of Param messages back to Dart Object? list.
+  List<Object?> _unpackParams(Iterable<Param> params) {
+    return params.map((param) {
+      switch (param.whichValue()) {
+        case Param_Value.stringValue:
+          return param.stringValue;
+        case Param_Value.intValue:
+          return param.intValue.toInt();
+        case Param_Value.doubleValue:
+          return param.doubleValue;
+        case Param_Value.boolValue:
+          return param.boolValue;
+        case Param_Value.bytesValue:
+          return param.bytesValue;
+        case Param_Value.notSet:
+          return null;
+      }
     }).toList();
+  }
+
+  /// Convert a list of Maps (from DatabaseCore.select) to a list of protobuf Rows.
+  List<Row> _rowsFromMaps(List<Map<String, dynamic>> maps) {
+    return maps.map((map) {
+      final columns = map.entries.map((entry) {
+        return Column(name: entry.key, value: _valueFromDart(entry.value));
+      }).toList();
+      return Row(columns: columns);
+    }).toList();
+  }
+
+  /// Wrap a Dart value into a protobuf Value.
+  Value _valueFromDart(Object? value) {
+    if (value is int) return Value(intValue: Int64(value));
+    if (value is String) return Value(stringValue: value);
+    if (value is bool) return Value(boolValue: value);
+    if (value is double) return Value(doubleValue: value);
+    if (value is Uint8List) return Value(bytesValue: value);
+    return Value();
   }
 
   @override
