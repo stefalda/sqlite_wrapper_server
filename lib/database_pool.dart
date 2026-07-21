@@ -66,6 +66,17 @@ class DatabasePool {
     close(dbName);
   }
 
+  /// Forcefully closes the connection for [dbName] regardless of refcount.
+  ///
+  /// Used by ImportBackup after replacing the database file on disk.
+  /// The next [get] call will reopen the new file.
+  static void forceClose(String dbName) {
+    final entry = _connections.remove(dbName);
+    if (entry != null) {
+      entry.wrapper.closeDB();
+    }
+  }
+
   /// Closes every tracked connection and clears the pool.
   ///
   /// Intended for graceful shutdown (SIGINT / SIGTERM).
@@ -89,6 +100,8 @@ class DatabasePool {
       final wrapper = SQLiteWrapperCore();
       wrapper.openDB(dbPath,
           version: version, onCreate: onCreate, onUpgrade: onUpgrade);
+      // Enable WAL mode for concurrent reads during backups.
+      wrapper.execute('PRAGMA journal_mode=WAL;');
       return _PoolEntry(wrapper);
     });
   }

@@ -1,3 +1,19 @@
+## 1.4.0
+
+- **New**: `ExportBackup` RPC — reads the SQLite file from disk and returns it as
+  bytes. Uses WAL mode so the file can be read while connections are active.
+- **New**: `ImportBackup` RPC — validates SQLite magic bytes, saves a timestamped
+  backup of the current DB, force-closes the pool entry, and writes the new file.
+- **New**: `ExportCSV` RPC — executes a client-supplied SQL query and returns the
+  result as a CSV string with proper header and escaping.
+- **New**: `DatabasePool.forceClose(String dbName)` — forcefully closes a pool
+  connection regardless of refcount, used by ImportBackup after file replacement.
+- **New**: WAL mode enabled in `DatabasePool._entry()` after `openDB()` for
+  concurrent reads during backup.
+- **New**: `maxMessageLength` set to 100 MB in `Server.create()` to support
+  large database transfers.
+- Updated generated Dart stubs from proto.
+
 ## 1.3.0
 
 - **Breaking**: `SqlQueryRequest.params` changed from `repeated google.protobuf.Any`

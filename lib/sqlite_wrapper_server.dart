@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:fixnum/fixnum.dart';
@@ -212,6 +214,107 @@ class SQLiteWrapperServerImpl extends SqliteWrapperServiceBase {
     }
   }
 
+  @override
+  Future<ExportBackupResponse> exportBackup(
+      ServiceCall call, ExportBackupRequest request) async {
+    final String dbName = _getDBName(call: call, dbName: request.dbName);
+    final String dbPath = _getDBPath(dbName);
+
+    print("ExportBackup called: dbName=$dbName");
+
+    final file = File(dbPath);
+    if (!await file.exists()) {
+      throw GrpcError.notFound('Database file not found: $dbPath');
+    }
+
+    try {
+      final data = await file.readAsBytes();
+      return ExportBackupResponse(data: data);
+    } catch (e) {
+      throw GrpcError.internal('Failed to read database file: $e');
+    }
+  }
+
+  @override
+  Future<ImportBackupResponse> importBackup(
+      ServiceCall call, ImportBackupRequest request) async {
+    final String dbName = _getDBName(call: call, dbName: request.dbName);
+    final String dbPath = _getDBPath(dbName);
+
+    print("ImportBackup called: dbName=$dbName, data.length=${request.data.length}");
+
+    // Validate SQLite magic bytes.
+    const sqliteMagic = 'SQLite format 3\x00';
+    if (request.data.length < 16 ||
+        String.fromCharCodes(request.data.sublist(0, 16)) != sqliteMagic) {
+      return ImportBackupResponse(
+        success: false,
+        message: 'Invalid SQLite database file (magic bytes mismatch)',
+      );
+    }
+
+    final dbFile = File(dbPath);
+
+    // Create a backup of the current database.
+    if (await dbFile.exists()) {
+      final now = DateTime.now();
+      final timestamp =
+          '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}'
+          '_${now.hour.toString().padLeft(2, '0')}${now.minute.toString().padLeft(2, '0')}'
+          '${now.second.toString().padLeft(2, '0')}_${now.millisecond.toString().padLeft(3, '0')}';
+      final backupPath = '${dbPath}_backup_$timestamp';
+
+      try {
+        await dbFile.copy(backupPath);
+        print("ImportBackup: saved backup to $backupPath");
+      } catch (e) {
+        return ImportBackupResponse(
+          success: false,
+          message: 'Failed to create backup: $e',
+        );
+      }
+    }
+
+    // Force close the pool entry so the file is not locked.
+    DatabasePool.forceClose(dbName);
+
+    // Write the new database file.
+    try {
+      await dbFile.writeAsBytes(request.data);
+      print("ImportBackup: restored database from backup data");
+      return ImportBackupResponse(
+        success: true,
+        message: 'Database restored successfully',
+      );
+    } catch (e) {
+      // Try to restore from backup on write failure.
+      return ImportBackupResponse(
+        success: false,
+        message: 'Failed to write database: $e',
+      );
+    }
+  }
+
+  @override
+  Future<ExportCSVResponse> exportCSV(
+      ServiceCall call, ExportCSVRequest request) async {
+    final String dbName = _getDBName(call: call, dbName: request.dbName);
+    final String dbPath = _getDBPath(dbName);
+
+    print("ExportCSV called: dbName=$dbName, sql=${request.sql}");
+
+    final pool = DatabasePool.get(dbName, dbPath);
+    try {
+      final results = await pool.query(request.sql);
+      final csv = _mapListToCsv(results as List<Map<String, dynamic>>);
+      return ExportCSVResponse(data: Uint8List.fromList(utf8.encode(csv)));
+    } catch (e) {
+      throw GrpcError.invalidArgument('CSV export error: $e');
+    } finally {
+      DatabasePool.close(dbName);
+    }
+  }
+
   // ==================== Helper methods ====================
 
   String _printParams(Iterable<Param> params) {
@@ -328,5 +431,36 @@ class SQLiteWrapperServerImpl extends SqliteWrapperServiceBase {
       }
     }
     throw GrpcError.unavailable('Database busy after $maxRetries attempts');
+  }
+
+  /// Convert a list of maps to CSV format with proper escaping.
+  ///
+  /// The first row contains column headers.
+  String _mapListToCsv(List<Map<String, dynamic>> mapList) {
+    if (mapList.isEmpty) return '';
+
+    final buffer = StringBuffer();
+    final keys = mapList.first.keys.toList();
+
+    // Header row
+    buffer.writeln(keys.map(_csvEscape).join(','));
+
+    // Data rows
+    for (final map in mapList) {
+      buffer.writeln(keys.map((k) => _csvEscape(map[k])).join(','));
+    }
+
+    return buffer.toString();
+  }
+
+  /// Escape a value for CSV (handle null, commas, double quotes, newlines).
+  String _csvEscape(dynamic value) {
+    if (value == null) return '';
+    final s = value.toString();
+    // Must escape if contains comma, double-quote, or newline.
+    if (s.contains(',') || s.contains('"') || s.contains('\n') || s.contains('\r')) {
+      return '"${s.replaceAll('"', '""')}"';
+    }
+    return s;
   }
 }

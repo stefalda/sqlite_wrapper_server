@@ -31,6 +31,19 @@ database storage.
   tables. The server uses a reference-counted connection pool so that mutations
   from any client trigger notifications on all active watch subscriptions —
   enabling reactive multi-user UIs without polling.
+- **ExportBackup RPC (v1.4.0+):** Export the entire database file as bytes
+  for backup. Uses WAL mode so the file can be read while connections are
+  active. Useful for web clients that cannot access the filesystem.
+- **ImportBackup RPC (v1.4.0+):** Import/restore a database from bytes.
+  Validates SQLite magic bytes, saves a timestamped backup of the current DB,
+  force-closes the pool entry, and writes the new file.
+- **ExportCSV RPC (v1.4.0+):** Execute a client-supplied SQL query and return
+  the result as a properly escaped CSV string with header row.
+- **WAL mode (v1.4.0+):** WAL journal mode is enabled automatically in
+  `DatabasePool` after opening each database for concurrent read access.
+- **forceClose (v1.4.0+):** `DatabasePool.forceClose()` forcefully closes
+  a pooled connection regardless of refcount, used by ImportBackup after
+  file replacement.
 - **Demo Flutter Client:** Includes a sample client application to demonstrate
   functionality.
 - **Proxy Integration:** Due to CORS restrictions and Dart gRPC limitations, the
