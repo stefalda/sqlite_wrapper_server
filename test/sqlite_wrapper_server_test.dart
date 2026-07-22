@@ -51,6 +51,7 @@ void main() {
     DatabasePool.closeAll();
     Constants.sharedDB = false;
     Constants.dbPath = testDir.path;
+    Constants.dbName = null;
   });
 
   group('_getDBName', () {
@@ -76,7 +77,7 @@ void main() {
       expect(response.dbName, 'shared_test');
     });
 
-    test('appends uuid to dbName when uuid present', () async {
+    test('appends uuid to dbName when uuid present (no email)', () async {
       Constants.sharedDB = false;
       Constants.dbPath = testDir.path;
       final impl = SQLiteWrapperServerImpl();
@@ -84,7 +85,58 @@ void main() {
 
       final response = await impl.openDB(
           call, OpenDBRequest(dbName: 'app_test'));
+      // Without email, format is {prefix}_{uuid}
       expect(response.dbName, 'app_test_my-uuid');
+    });
+
+    test('includes email in dbName when email is present', () async {
+      Constants.sharedDB = false;
+      Constants.dbPath = testDir.path;
+      final impl = SQLiteWrapperServerImpl();
+      final call = FakeServiceCall(clientMetadata: {
+        'user_uuid': 'my-uuid',
+        'email': 'user@example.com',
+      });
+
+      final response = await impl.openDB(
+          call, OpenDBRequest(dbName: 'app_test'));
+      expect(response.dbName,
+          'app_test_user_at_example_dot_com_my-uuid');
+    });
+
+    test('handles email with dots and plus sign', () async {
+      Constants.sharedDB = false;
+      Constants.dbPath = testDir.path;
+      final impl = SQLiteWrapperServerImpl();
+      final call = FakeServiceCall(clientMetadata: {
+        'user_uuid': 'uuid-789',
+        'email': 'mario.rossi+spam@gmail.com',
+      });
+
+      final response = await impl.openDB(
+          call, OpenDBRequest(dbName: 'mainDB'));
+      // @ -> _at_, dots -> _dot_, + stays (then sanitized by _sanitizeDBName in _getDBPath)
+      expect(response.dbName,
+          'mainDB_mario_dot_rossi+spam_at_gmail_dot_com_uuid-789');
+    });
+
+    test('works with Constants.dbName override and email', () async {
+      Constants.sharedDB = false;
+      Constants.dbPath = testDir.path;
+      Constants.dbName = 'custom';  // override
+      final impl = SQLiteWrapperServerImpl();
+      final call = FakeServiceCall(clientMetadata: {
+        'user_uuid': 'uuid-xyz',
+        'email': 'admin@test.org',
+      });
+
+      final response = await impl.openDB(
+          call, OpenDBRequest(dbName: 'ignored_client_name'));
+      expect(response.dbName,
+          'custom_admin_at_test_dot_org_uuid-xyz');
+
+      // Reset for other tests
+      Constants.dbName = null;
     });
   });
 
@@ -104,4 +156,6 @@ void main() {
       expect(response.dbName, '../../etc/passwd_safe-uuid');
     });
   });
+
+
 }

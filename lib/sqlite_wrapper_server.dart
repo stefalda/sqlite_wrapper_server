@@ -17,8 +17,21 @@ class SQLiteWrapperServerImpl extends SqliteWrapperServiceBase {
     return dbName.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_');
   }
 
-  /// The DB Name is created appending to the dbName the user UUID.
+  /// Encode email for safe inclusion in a filename.
+  ///
+  /// Replaces `@` with `_at_` and `.` with `_dot_` so the email remains
+  /// human-readable in the filename. The result is further sanitized by
+  /// [_sanitizeDBName] before filesystem use.
+  String _encodeEmailForFilename(String email) {
+    return email
+        .replaceAll('@', '_at_')
+        .replaceAll('.', '_dot_');
+  }
+
+  /// The DB Name is created appending to the dbName the user UUID and email.
   /// If Constants.dbName is set, it overrides the client-supplied dbName.
+  ///
+  /// Format: `{prefix}_{sanitizedEmail}_{uuid}`
   String _getDBName({required ServiceCall call, required String dbName}) {
     final String? uuid = call.clientMetadata!['user_uuid'];
     if (uuid == null) {
@@ -29,8 +42,12 @@ class SQLiteWrapperServerImpl extends SqliteWrapperServiceBase {
             'User not authenticated for non-shared database');
       }
     }
+    final String email = call.clientMetadata!['email'] ?? '';
+    final String emailSuffix = email.isNotEmpty
+        ? '${_encodeEmailForFilename(email)}_'
+        : '';
     final prefix = Constants.dbName ?? dbName;
-    return "${prefix}_$uuid";
+    return '${prefix}_$emailSuffix$uuid';
   }
 
   String _getDBPath(String dbName) {
