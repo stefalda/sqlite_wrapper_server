@@ -1,3 +1,12 @@
+## 1.4.2
+
+- **Fixed**: `DatabasePool` no longer resets `PRAGMA user_version` to 0 when a
+  pooled connection is re-opened without an explicit version. Previously every
+  new connection called `SQLiteWrapperCore.openDB(version: 0)`, which wrote
+  `user_version = 0`; as a result the server always reported `created: true`
+  and clients re-ran their creation script on every launch. The pool now reads
+  the value stored in the file and opens with it.
+
 ## 1.4.0
 
 - **New**: `ExportBackup` RPC — reads the SQLite file from disk and returns it as

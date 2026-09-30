@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:sqlite_wrapper_server/database_pool.dart';
 import 'package:test/test.dart';
@@ -41,6 +42,46 @@ void main() {
       // Both connections alive.
       DatabasePool.closeAll();
       // Both gone.
+    });
+  });
+
+  group('DatabasePool version preservation', () {
+    test('reopening a pooled database does not reset user_version', () async {
+      final dbName = nextDbName();
+      final dir = Directory.systemTemp.createTempSync('pool_version');
+      addTearDown(() => dir.deleteSync(recursive: true));
+      final path = '${dir.path}/preserve.sqlite';
+
+      final first = DatabasePool.get(dbName, path);
+      await first.setVersion(7);
+      expect(await first.getVersion(), 7);
+      DatabasePool.close(dbName);
+
+      // A later RPC (execute/select/getVersion) opens the connection without
+      // passing a version. That must not wipe the stored user_version.
+      final second = DatabasePool.get(dbName, path);
+      // openDB is fire-and-forget inside the pool: wait for it to finish so
+      // a (buggy) reset to 0 has actually been applied before asserting.
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+      expect(await second.getVersion(), 7,
+          reason: 'reopening must not reset user_version to 0');
+      DatabasePool.close(dbName);
+    });
+
+    test('get(version:) keeps the version across reopens', () async {
+      final dbName = nextDbName();
+      final dir = Directory.systemTemp.createTempSync('pool_version');
+      addTearDown(() => dir.deleteSync(recursive: true));
+      final path = '${dir.path}/setversion.sqlite';
+
+      DatabasePool.get(dbName, path, version: 12);
+      // openDB is fire-and-forget inside the pool: give it a chance to run.
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      DatabasePool.close(dbName);
+
+      final reopened = DatabasePool.get(dbName, path);
+      expect(await reopened.getVersion(), 12);
+      DatabasePool.close(dbName);
     });
   });
 

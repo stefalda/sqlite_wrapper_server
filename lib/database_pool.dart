@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:io';
 
+import 'package:sqlite3/sqlite3.dart';
 import 'package:sqlite_wrapper/sqlite_wrapper.dart';
 
 /// Statically-allocated pool of SQLite connections with reference counting.
@@ -98,12 +100,44 @@ class DatabasePool {
   }) {
     return _connections.putIfAbsent(dbName, () {
       final wrapper = SQLiteWrapperCore();
+      // `SQLiteWrapperCore.openDB` applies `version` by running
+      // `PRAGMA user_version = version` whenever it differs from the value
+      // stored in the file. Pooled connections are re-opened with the default
+      // `version: 0`, which would reset the stored version to 0 on every new
+      // connection (making `created` always true and forcing clients to
+      // re-run their creation script on each launch). Read the current value
+      // first and open with that when the caller did not provide one.
+      final effectiveVersion =
+          version != 0 ? version : readVersionFromFile(dbPath);
       wrapper.openDB(dbPath,
-          version: version, onCreate: onCreate, onUpgrade: onUpgrade);
+          version: effectiveVersion, onCreate: onCreate, onUpgrade: onUpgrade);
       // Enable WAL mode for concurrent reads during backups.
       wrapper.execute('PRAGMA journal_mode=WAL;');
       return _PoolEntry(wrapper);
     });
+  }
+
+  /// Reads the `user_version` currently stored in the database file.
+  ///
+  /// Returns 0 when the file does not exist yet, is an in-memory database or
+  /// cannot be opened (the real open in `openDB` will surface the error).
+  static int readVersionFromFile(String dbPath) {
+    if (dbPath == inMemoryDatabasePath) return 0;
+    if (!File(dbPath).existsSync()) return 0;
+    Database? db;
+    try {
+      db = sqlite3.open(dbPath, mode: OpenMode.readWrite);
+      final rows = db.select('PRAGMA user_version;');
+      if (rows.isEmpty) return 0;
+      final value = rows.first.columnAt(0);
+      return value is int ? value : 0;
+    } catch (e) {
+      // Not a readable SQLite file: let the regular open report the error.
+      print('DatabasePool: cannot read user_version from $dbPath: $e');
+      return 0;
+    } finally {
+      db?.close();
+    }
   }
 }
 
